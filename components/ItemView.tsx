@@ -9,8 +9,42 @@ type Full = {
   id: string; kind: string; text: string; url: string | null; title: string | null; summary: string | null;
   fileName: string | null; mime: string | null; extracted: string | null; category: Category | null;
   overview: string | null; overviewBy: string | null; notes: string | null; sortedBy: string;
-  aiTries: number; image: string | null;
+  aiTries: number; image: string | null; project: { id: string; title: string; color: string | null } | null;
 };
+type ProjectChoice = { id: string; title: string; color: string | null };
+
+// The project chip in the tray: link the item to a project, or take it out of one.
+function ProjectPick({ item, onPicked }: { item: Full; onPicked: (project: ProjectChoice | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [projects, setProjects] = useState<ProjectChoice[]>([]);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/projects", { cache: "no-store" }).then((r) => r.json()).then(setProjects).catch(() => {});
+    const away = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [open]);
+  const pick = (p: ProjectChoice | null) => { setOpen(false); onPicked(p); };
+  return (
+    <span className="pick-cat" ref={ref}>
+      <button className="chip" onClick={() => setOpen(!open)} aria-label="Change project" aria-expanded={open}>
+        {item.project && <span className="dot square" style={{ background: item.project.color ?? "var(--muted)" }} />}
+        {item.project?.title ?? "No project"}
+      </button>
+      {open && (
+        <div className="menu">
+          {projects.map((p) => (
+            <button key={p.id} className={p.id === item.project?.id ? "on" : ""} onClick={() => pick(p)}>
+              <span className="dot square" style={{ background: p.color ?? "var(--muted)" }} />{p.title}
+            </button>
+          ))}
+          <button className={item.project ? "" : "on"} onClick={() => pick(null)}>No project</button>
+        </div>
+      )}
+    </span>
+  );
+}
 
 function youtubeId(url: string) {
   try {
@@ -26,7 +60,7 @@ function host(url: string) {
 }
 
 // A textarea that grows with its text and saves a moment after you stop typing (and when you leave it).
-function Field({ value, onSave, className, placeholder, label }: {
+export function Field({ value, onSave, className, placeholder, label }: {
   value: string; onSave: (v: string) => void; className?: string; placeholder?: string; label: string;
 }) {
   const [v, setV] = useState(value);
@@ -94,7 +128,7 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
     const r = await fetch(`/api/items/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     if (r.ok) {
       const next = await r.json();
-      setItem((cur) => (cur ? { ...cur, ...next, category: cur.category } : cur));
+      setItem((cur) => (cur ? { ...cur, ...next, category: cur.category, project: cur.project } : cur));
       inbox.refresh();
     }
   };
@@ -114,6 +148,9 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
               </button>
               {picking && <Menu inbox={inbox} item={{ id: item.id, categoryId: item.category?.id ?? null }} onClose={() => setPicking(false)} onPicked={load} />}
             </span>
+          )}
+          {item && (
+            <ProjectPick item={item} onPicked={(project) => { setItem({ ...item, project }); save({ projectId: project?.id ?? null }); }} />
           )}
           <span className="grow" />
           {item && (

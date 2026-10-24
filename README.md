@@ -2,7 +2,8 @@
 
 A home for messy personal projects that runs entirely on your own computer.
 
-- **Hub** (`/`): an infinite canvas that will hold your projects, with the Smart Inbox on the side.
+- **Hub** (`/`): an infinite canvas with a card for each project, and the Smart Inbox on the side.
+- **Project space** (`/p/...`): one project's tasks, notes, and saved inbox items, with a short summary of where it stands.
 - **Smart Inbox** (`/inbox`): drop in anything (notes, links, images, documents). Local AI sorts each item into a category and gives it a short title.
 
 Everything is stored in one file on your computer, and the AI runs locally with [Ollama](https://ollama.com). No account and no API key are needed, and nothing leaves your machine except reading the links you add. (One optional exception: if you set up Bright Data, the addresses of sites that block reading are sent to it. See [Settings](#settings-env).)
@@ -97,6 +98,10 @@ Hover over any icon to see what it does.
 - **The AI learns from your moves:** when you move an item to another category, the AI sees that the next time it sorts something similar. It also sees every category (including ones you made) and a few items already in each, so it knows what each one is for. If an item names one of your categories ("banana bread" → **Banana Bread**), it goes there.
 - **Delete an item:** hover over it and click the trash icon. This deletes it for good, including any uploaded file.
 - **Hub:** drag the background or scroll with two fingers to move around. Pinch (or hold Ctrl and scroll) to zoom. The button at the top right shows or hides the inbox.
+- **New project:** click **+** at the bottom left of the Hub and describe it in one sentence ("replace the ceiling fan in my bedroom"). The AI suggests a name and a few sections. Rename it, remove sections you don't want with ×, and click **Create**. With the AI off, the closest built-in template is used (Research Paper, Event, Learning, or Utility Task).
+- **Project cards:** drag a card to move it, and click it to open the project. Drag an inbox item from the side panel onto a card to add it to that project.
+- **Inside a project:** check off and add tasks, write notes, and open saved items. **Add from inbox** finds items to add, and × takes one out (it stays in the inbox). **+ Section** adds Tasks, Notes, Items, or Help nearby. Drag a section by the dots on its left to reorder it. The summary on the left is written by the AI. Press ↻ for a fresh one, or write your own.
+- **From a tray:** the chip next to the category says which project the item is in. Click it to pick another project or **No project**.
 
 ---
 
@@ -202,7 +207,11 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | `lib/ollama.ts` | Talks to Ollama |
 | `lib/link.ts` | Reads a link's title and description (cached) |
 | `lib/files.ts` | Saves uploads and pulls text out of documents |
-| `components/ItemView.tsx` | The tray view: summary, content, and notes, all editable |
+| `components/ItemView.tsx` | The tray view: summary, content, and notes, all editable, plus the category and project chips |
+| `app/p/[id]/page.tsx`, `components/ProjectSpace.tsx` | The project space: sections, tasks, notes, linked items, summary |
+| `components/Projects.tsx`, `lib/useProjects.ts` | Project cards and the New project box on the Hub |
+| `lib/projects.ts` | Suggested sections (AI, or a template), project colors, project summary |
+| `app/api/projects/`, `app/api/sections/`, `app/api/tasks/` | Make, change, reorder, and delete projects, sections, and tasks |
 | `app/api/categories/` | Make, rename, recolor, and delete categories |
 | `lib/colors.ts` | Category colors |
 | `app/api/` | Server routes: `items` (list, add, change, delete), `files` (serve uploads), `status` |
