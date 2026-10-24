@@ -4,6 +4,7 @@ import { useInbox } from "@/lib/useInbox";
 import { Categories, InboxList } from "./Inbox";
 import { PanelIcon } from "./Icons";
 import Nav from "./Nav";
+import { names } from "@/lib/names";
 
 type View = { x: number; y: number; z: number };
 const GRID = 24;
@@ -96,6 +97,7 @@ export default function Hub() {
       </button>
       {panel && (
         <aside className="panel">
+          <h2 className="heading">{names.inbox}</h2>
           <Categories inbox={inbox} selected={selected} onSelect={setSelected} chips />
           <InboxList inbox={inbox} selected={selected} />
         </aside>

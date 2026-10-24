@@ -15,16 +15,41 @@ function meta(html: string, key: string) {
   return content ? decode(content) : null;
 }
 
+// Sites whose pages hide the title from simple fetches but offer it through oEmbed.
+const OEMBED: [RegExp, string][] = [
+  [/(^|\.)(youtube\.com|youtu\.be)$/, "https://www.youtube.com/oembed?format=json&url="],
+  [/(^|\.)vimeo\.com$/, "https://vimeo.com/api/oembed.json?url="],
+];
+
+async function oembed(url: string) {
+  let host = "";
+  try { host = new URL(url).hostname; } catch { return null; }
+  const base = OEMBED.find(([re]) => re.test(host))?.[1];
+  if (!base) return null;
+  try {
+    const r = await fetch(base + encodeURIComponent(url), { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return typeof j.title === "string" ? { title: j.title as string, summary: j.author_name ? `Video by ${j.author_name}` : null } : null;
+  } catch {
+    return null;
+  }
+}
+
 // Reads a page's title and description once, then serves it from the cache.
-// Failed reads are retried after an hour (e.g. when you were offline).
+// Reads that found no title are retried after an hour (e.g. when you were offline).
 export async function readLink(url: string) {
   const cached = await db.pageCache.findUnique({ where: { url } });
-  if (cached && (cached.ok || Date.now() - cached.fetchedAt.getTime() < 3600_000)) return cached;
+  if (cached && (cached.title || Date.now() - cached.fetchedAt.getTime() < 3600_000)) return cached;
 
   let title: string | null = null;
   let summary: string | null = null;
   let ok = false;
-  try {
+  const embed = await oembed(url);
+  if (embed) {
+    ({ title, summary } = embed);
+    ok = true;
+  } else try {
     const r = await fetch(url, {
       headers: { "user-agent": "Mozilla/5.0 (Macintosh) ProjectScaffold/0.1", accept: "text/html" },
       redirect: "follow",

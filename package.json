@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "setup": "prisma db push",
-    "dev": "next dev",
+    "dev": "prisma db push && next dev",
     "build": "next build",
     "start": "next start",
     "db:reset": "prisma db push --force-reset"
@@ -13,7 +13,8 @@
     "@prisma/client": "6.16.2",
     "next": "15.5.28",
     "react": "19.1.10",
-    "react-dom": "19.1.10"
+    "react-dom": "19.1.10",
+    "unpdf": "1.8.1"
   },
   "devDependencies": {
     "@types/node": "22.18.6",
