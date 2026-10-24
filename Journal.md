@@ -8,7 +8,7 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** Projects round 2a (PR #7, in review): Auto vs Space, sections, Hub cards and links. Next is 2b, the Scouts engine (Find, Answer, Turn into), after Mehvish approves section 3 of `plans/Projects_v2_Plan.md`.
+**Working on:** Projects round 2a (PR #8, in review): Auto vs Space, sections, Hub cards and links. Next is 2b, the Scouts engine (Find, Answer, Turn into), after Mehvish approves section 3 of `plans/Projects_v2_Plan.md`.
 **Done:** F1 Smart Inbox (PR #5), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
@@ -35,7 +35,7 @@ Ordered. Feature numbers match the plan.
 - [ ] Undo after deleting an item (F1)
 - [ ] Check Bright Data on the Mac: paste the allrecipes link, look for `[link] read … with Bright Data` (F1)
 - [ ] Service Scout with Bright Data SERP API + Web Unlocker (F5, Bright Data prize)
-- [ ] Try PR #7 on the Mac with gemma3:4b: make a Space and an Auto project and check the sections and proposed steps
+- [ ] Try PR #8 on the Mac with gemma3:4b: make a Space and an Auto project and check the sections and proposed steps
 - [ ] Approve the Scouts design (plan section 3), then build 2b
 - [ ] Decide on Factory Droid SDK or Fetch.ai for the Scouts (F5)
 - [ ] Status dot shows offline too, not just AI on or off (F6)
@@ -56,13 +56,13 @@ Ordered. Feature numbers match the plan.
 - [x] Side trays, New category and drag-to-tag in the sidebar (2026-10-24, PR #4, merged)
 - [x] Edit and delete categories, change category in a tray, AI learns from moves, Bright Data backup for blocked links, inbox final pass (2026-10-24, PR #5, merged)
 - [x] F3 + F4: project cards on the Hub, new project from one sentence, project space with tasks, notes, linked items, and summary, plus a project chip in the tray (2026-10-24, PR #6, merged)
-- [x] Projects round 2a: Auto vs Space, Writing/Tasks/Sources sections in a grid, formatting, Sources that add to the inbox, bigger cards, links between projects (2026-10-24, PR #7)
+- [x] Projects round 2a: Auto vs Space, Writing/Tasks/Sources sections in a grid, formatting, Sources that add to the inbox, bigger cards, links between projects (2026-10-24, PR #8)
 
 ---
 
 ## Log
 
-### 2026-10-24 · Projects round 2a (PR #7)
+### 2026-10-24 · Projects round 2a (PR #8)
 
 Mehvish's feedback on PR #6 led to a new plan, `plans/Projects_v2_Plan.md` (not in the repo). This PR builds round 2a of it.
 
