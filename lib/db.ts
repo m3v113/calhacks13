@@ -1,19 +1,12 @@
 import { PrismaClient } from "@prisma/client";
+import { PALETTE, STARTER_COLORS } from "./colors";
 
 const g = globalThis as unknown as { prisma?: PrismaClient };
 export const db = g.prisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== "production") g.prisma = db;
 
 // Starter categories; the AI adds more when nothing fits.
-const STARTERS = [
-  { name: "Recipes", color: "#F08A4B" },
-  { name: "Wordle", color: "#6AAA64" },
-  { name: "Events", color: "#4A7CF7" },
-  { name: "Other", color: "#A3A3A8" },
-];
-
-// Colors handed to new categories, in order.
-const PALETTE = ["#E0607E", "#9B6DE0", "#2BB3A6", "#E5B83B", "#5AA9E6", "#C7834F", "#7A8C3C", "#D46CC4"];
+const STARTERS = Object.entries(STARTER_COLORS).map(([name, color]) => ({ name, color }));
 
 let seeded = false;
 export async function ensureSeed() {

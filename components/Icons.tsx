@@ -45,3 +45,6 @@ export const OpenIcon = () => (
 export const RefreshIcon = () => (
   <svg {...p}><path d="M20 12a8 8 0 1 1-2.3-5.7" /><path d="M20 4v5h-5" /></svg>
 );
+export const MoreIcon = () => (
+  <svg {...p}><circle cx="6" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="18" cy="12" r="1" fill="currentColor" /></svg>
+);

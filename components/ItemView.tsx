@@ -2,12 +2,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Category, useInbox } from "@/lib/useInbox";
 import { CloseIcon, OpenIcon, RefreshIcon, TrashIcon } from "./Icons";
+import { Menu, fromUrl } from "./Inbox";
 
 type Inbox = ReturnType<typeof useInbox>;
 type Full = {
   id: string; kind: string; text: string; url: string | null; title: string | null; summary: string | null;
   fileName: string | null; mime: string | null; extracted: string | null; category: Category | null;
   overview: string | null; overviewBy: string | null; notes: string | null; sortedBy: string;
+  aiTries: number; image: string | null;
 };
 
 function youtubeId(url: string) {
@@ -53,6 +55,7 @@ function Field({ value, onSave, className, placeholder, label }: {
 // The tray view: the summary on the left, the item in the middle, your notes on the right. Everything saves as you type.
 export default function ItemView({ id, inbox, onClose }: { id: string; inbox: Inbox; onClose: () => void }) {
   const [item, setItem] = useState<Full | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/items/${id}`, { cache: "no-store" });
@@ -68,12 +71,23 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
 
   // While the AI is writing the summary, check back every couple of seconds. It can't write one for a link
   // whose page couldn't be read, or for an image when no image model is installed.
-  const waiting = !!item && !item.overview && inbox.ai === true
-    && !(item.kind === "link" && !item.title) && !(item.kind === "image" && !inbox.vision);
+  const unread = item?.kind === "link" && !item.title;
+  const blind = item?.kind === "image" && !inbox.vision;
+  const gaveUp = !!item && item.aiTries >= 3;
+  const waiting = !!item && !item.overview && inbox.ai === true && !unread && !blind && !gaveUp;
+  // When there's no summary and none is coming, say why.
+  const noSummary = unread ? "This page couldn't be read, so there's no summary. You can write one here."
+    : blind ? "No image model is installed, so there's no summary yet. You can write one here."
+    : gaveUp ? "The AI couldn't write a summary for this. Write one here, or press ↻ to try again."
+    : inbox.ai === false ? "Local AI is off. The summary is written once it's back, or you can write one here."
+    : "Write a summary";
+  const [slow, setSlow] = useState(false);
   useEffect(() => {
+    setSlow(false);
     if (!waiting) return;
     const t = setInterval(load, 2500);
-    return () => clearInterval(t);
+    const s = setTimeout(() => setSlow(true), 45000);
+    return () => { clearInterval(t); clearTimeout(s); };
   }, [waiting, load]);
 
   const save = async (body: object) => {
@@ -93,8 +107,13 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="tray" role="dialog" aria-modal="true" aria-label={item?.title ?? "Item"}>
         <div className="tray-top">
-          {item?.category && (
-            <span className="chip"><span className="dot" style={{ background: item.category.color }} />{item.category.name}</span>
+          {item && (
+            <span className="pick-cat">
+              <button className="chip" onClick={() => setPicking(!picking)} aria-label="Change category" aria-expanded={picking}>
+                <span className="dot" style={{ background: item.category?.color ?? "var(--line)" }} />{item.category?.name ?? "Sorting…"}
+              </button>
+              {picking && <Menu inbox={inbox} item={{ id: item.id, categoryId: item.category?.id ?? null }} onClose={() => setPicking(false)} onPicked={load} />}
+            </span>
           )}
           <span className="grow" />
           {item && (
@@ -108,17 +127,17 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
               <div className="label">
                 Summary
                 <button className="icon small" data-tip="Write a new summary" aria-label="Write a new summary"
-                  onClick={() => { setItem({ ...item, overview: null, overviewBy: null }); save({ summarize: true }); }}>
+                  onClick={() => { setItem({ ...item, overview: null, overviewBy: null, aiTries: 0 }); save({ summarize: true }); }}>
                   <RefreshIcon />
                 </button>
               </div>
               {!waiting
-                ? <Field className="tray-summary" label="Summary" placeholder="Write a summary" value={item.overview ?? ""} onSave={(overview) => save({ overview })} />
-                : <div className="tray-summary pending-lines" aria-label="Writing a summary"><span /><span /><span /></div>}
+                ? <Field className="tray-summary" label="Summary" placeholder={noSummary} value={item.overview ?? ""} onSave={(overview) => save({ overview })} />
+                : <div className="tray-summary pending-lines" aria-label="Writing a summary"><span /><span /><span /><em>{slow ? "Still writing. Long items can take a few minutes, and it'll say so if it can't." : "Writing a summary…"}</em></div>}
             </section>
 
             <section className="tray-main">
-              <Field className="tray-title" label="Title" placeholder="Title" value={item.title ?? ""} onSave={(title) => save({ title })} />
+              <Field className="tray-title" label="Title" placeholder={(item.url && fromUrl(item.url)) || "Title"} value={item.title ?? ""} onSave={(title) => save({ title })} />
 
               {item.kind === "note" && <Field className="tray-text" label="Note" placeholder="Write a note" value={item.text} onSave={(text) => save({ text })} />}
 
@@ -127,6 +146,12 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
                   {yt && (
                     <iframe className="video" src={`https://www.youtube-nocookie.com/embed/${yt}`} title={item.title ?? "Video"}
                       allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                  )}
+                  {!yt && (item.image || item.summary) && (
+                    <a className="preview" href={item.url} target="_blank" rel="noreferrer">
+                      {item.image && <img src={item.image} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
+                      {item.summary && <span>{item.summary}</span>}
+                    </a>
                   )}
                   <a className="source" href={item.url} target="_blank" rel="noreferrer"><OpenIcon />{host(item.url)}</a>
                 </>
