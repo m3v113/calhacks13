@@ -42,3 +42,6 @@ export const CloseIcon = () => (
 export const OpenIcon = () => (
   <svg {...p}><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" /></svg>
 );
+export const RefreshIcon = () => (
+  <svg {...p}><path d="M20 12a8 8 0 1 1-2.3-5.7" /><path d="M20 4v5h-5" /></svg>
+);

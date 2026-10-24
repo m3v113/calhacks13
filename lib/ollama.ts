@@ -1,16 +1,17 @@
 const URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
 export const MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:3b";
-const VISION = process.env.OLLAMA_VISION_MODEL ?? "llama3.2-vision";
+const VISION = process.env.OLLAMA_VISION_MODEL; // optional: the image model to prefer
 
-let last = { at: 0, models: null as string[] | null };
+type Model = { name: string; size: number };
+let last = { at: 0, models: null as Model[] | null };
 
-// Installed model names, or null when Ollama isn't running. Cached for a few seconds.
+// Installed models, or null when Ollama isn't running. Cached for a few seconds.
 async function models() {
   if (Date.now() - last.at < 5000) return last.models;
-  let list: string[] | null = null;
+  let list: Model[] | null = null;
   try {
     const r = await fetch(`${URL}/api/tags`, { signal: AbortSignal.timeout(1500) });
-    if (r.ok) list = ((await r.json()).models ?? []).map((m: { name: string }) => m.name);
+    if (r.ok) list = ((await r.json()).models ?? []).map((m: Model) => ({ name: m.name, size: m.size ?? 0 }));
   } catch {}
   last = { at: Date.now(), models: list };
   return list;
@@ -20,10 +21,39 @@ export async function ollamaUp() {
   return (await models()) !== null;
 }
 
-// The vision model, if one is installed (used to read images).
+// Which models can see images, asked once per model (Ollama lists "vision" in its capabilities).
+const canSee = new Map<string, boolean>();
+// Models that said they can see images but failed to load (e.g. too new or too old for this Ollama).
+const broken = new Set<string>();
+
+async function hasVision(name: string) {
+  if (!canSee.has(name)) {
+    try {
+      const r = await fetch(`${URL}/api/show`, { method: "POST", body: JSON.stringify({ model: name }), signal: AbortSignal.timeout(3000) });
+      const caps: string[] = r.ok ? ((await r.json()).capabilities ?? []) : [];
+      canSee.set(name, caps.includes("vision"));
+    } catch {
+      return false;
+    }
+  }
+  return canSee.get(name)!;
+}
+
+// The model used to read images: OLLAMA_VISION_MODEL if set and working, otherwise the smallest
+// installed model that can see images. Null when there's none.
 export async function visionModel() {
   const list = await models();
-  return list?.find((n) => n.startsWith(VISION)) ?? list?.find((n) => /vision|llava/.test(n)) ?? null;
+  if (!list) return null;
+  const ordered = [...list].sort((a, b) =>
+    Number(!!VISION && b.name.startsWith(VISION)) - Number(!!VISION && a.name.startsWith(VISION)) || a.size - b.size);
+  for (const m of ordered) {
+    if (!broken.has(m.name) && (await hasVision(m.name))) return m.name;
+  }
+  return null;
+}
+
+export function markBroken(name: string) {
+  broken.add(name);
 }
 
 type Opts = { model?: string; images?: string[] };
@@ -41,9 +71,9 @@ export async function chatJSON<T>(system: string, user: string, schema: object, 
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model: opts.model ?? MODEL, messages, format: schema, stream: false, options: { temperature: 0 } }),
-      signal: AbortSignal.timeout(opts.images ? 90000 : 30000),
+      signal: AbortSignal.timeout(60000),
     });
-    if (!r.ok) throw new Error(`ollama ${r.status}`);
+    if (!r.ok) throw new Error(`ollama ${r.status}: ${(await r.text()).slice(0, 300)}`);
     const body = await r.json();
     try {
       const v = JSON.parse(body?.message?.content ?? "");
@@ -54,4 +84,19 @@ export async function chatJSON<T>(system: string, user: string, schema: object, 
     }
   }
   throw new Error(`ollama: ${lastError}`);
+}
+
+// A plain-text answer (no JSON), e.g. a vision model describing an image.
+// The first call can be slow while Ollama loads a large model, so the timeout is generous.
+export async function chatText(model: string, prompt: string, images?: string[]) {
+  const r = await fetch(`${URL}/api/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt, ...(images ? { images } : {}) }], stream: false, options: { temperature: 0 } }),
+    signal: AbortSignal.timeout(240000),
+  });
+  if (!r.ok) throw new Error(`ollama ${model} ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  const text = (await r.json())?.message?.content;
+  if (typeof text !== "string" || !text.trim()) throw new Error(`ollama ${model}: empty answer`);
+  return text.trim();
 }

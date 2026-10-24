@@ -37,13 +37,15 @@ Ollama runs AI models on your computer.
    ollama pull llama3.2:3b
    ```
 
-4. **For images:** to have screenshots and photos read and sorted by what's in them, also download the vision model (about 8 GB):
+4. **For images:** to have screenshots and photos read and sorted by what's in them, you need a model that can see images. If you don't have one, download a small one (about 3 GB):
 
    ```bash
-   ollama pull llama3.2-vision
+   ollama pull gemma3:4b
    ```
 
-   Without it, images are only sorted by their file name (so a screenshot just shows its file name). Images added before you install it are re-sorted on their own about a minute after the app sees the model.
+   The app finds any installed model that can see images on its own (it asks Ollama which ones can), and uses the smallest. Without one, images are only sorted by their file name, and they're re-read on their own once a model is installed.
+
+   > `llama3.2-vision` doesn't work on recent Ollama versions ("unknown model architecture: 'mllama'"). The app skips it, and you can remove it with `ollama rm llama3.2-vision` to free 8 GB.
 
 ### 3. Get the code
 
@@ -94,7 +96,7 @@ Hover over any icon to see what it does.
 
 - **Add a note:** type in the box and press **Enter**. **Shift + Enter** adds a new line.
 - **Add a link, image, or document:** press **+** and pick one. You can also drag files onto the inbox or paste an image.
-- **Open an item:** click it to see it in full: the whole note, the image, the PDF, or the video. Press **Esc** or click outside to close.
+- **Open an item (a "tray"):** click it. On the left are the content (the note, image, PDF, or video) and an AI summary. On the right is space for your own notes. Everything is editable and saves as you type: click the title, note, summary, or notes to change them. The ↻ button next to Summary writes a fresh one. Links only open when you click the link inside the tray. Press **Esc** or click outside to close.
 - **Move an item to another category:** click its colored dot or category name, then pick a category, or type a new name in **New** and press Enter.
 - **Delete an item:** hover over it and click the trash icon. This deletes it for good, including any uploaded file.
 - **Hub:** drag the background or scroll with two fingers to move around. Pinch (or hold Ctrl and scroll) to zoom. The button at the top right shows or hides the inbox.
@@ -120,7 +122,7 @@ npm run dev       # also updates the database to match
 | `DATABASE_URL` | `file:../data/app.db` | Where your data is stored |
 | `OLLAMA_URL` | `http://localhost:11434` | Where Ollama is running |
 | `OLLAMA_MODEL` | `llama3.2:3b` | Model used to sort and title items |
-| `OLLAMA_VISION_MODEL` | `llama3.2-vision` | Model used to read images, if installed |
+| `OLLAMA_VISION_MODEL` | (none) | Optional. The model to read images with. Without it, the smallest installed model that can see images is used. |
 
 Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 
@@ -134,7 +136,8 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | `command not found: ollama` | Open the Ollama app once; it adds the command. Then reopen Terminal. |
 | The dot stays yellow | Open the Ollama app, and check that `ollama list` shows `llama3.2:3b`. |
 | Everything lands in "Other" | Usually Ollama isn't running. Start it and the inbox re-sorts within a minute. |
-| An image only shows its file name | No image model is installed. Run `ollama pull llama3.2-vision`, then wait a minute. |
+| An image only shows its file name | No working image model. Run `ollama pull gemma3:4b`, then wait a couple of minutes. The Terminal shows `[sort] image model … failed` with the reason if one is installed but broken. |
+| A summary never appears | Check the Terminal for `[sort] AI failed`. Summaries need Ollama running. A link whose page can't be read gets no summary, but you can write one. |
 | `Module not found: Can't resolve '…'` | A new library was added in an update. Run `npm install`. |
 | A page says 404 | The Hub is at http://localhost:3000 and the inbox at http://localhost:3000/inbox. |
 | `Environment variable not found: DATABASE_URL` | You skipped `cp .env.example .env`. Run it, then try again. |
@@ -151,15 +154,17 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | App (pages and server) | [Next.js](https://nextjs.org) 15 + React + TypeScript | One project for both the screens and the server code |
 | Database | SQLite via [Prisma](https://www.prisma.io) 6 | Your data is one file, `data/app.db`, with no database server to run |
 | Local AI | [Ollama](https://ollama.com) | Runs models on your Mac. The app asks for JSON in a fixed shape, checks it, and retries once. |
-| Reading documents | [unpdf](https://github.com/unjs/unpdf) | Pulls text out of PDFs so the AI can sort them |
+| Reading documents | [unpdf](https://github.com/unjs/unpdf) | Pulls text out of PDFs so the AI can sort and summarize them |
+| Reading web pages | [Readability](https://github.com/mozilla/readability) + [linkedom](https://github.com/WebReflection/linkedom) | Pulls the article text out of a page, without menus and ads, on your Mac. This is what Firefox's Reader View uses. |
+| Research papers | [Crossref](https://www.crossref.org) | A free database of journal papers. Gives the real title, journal, year, and often the abstract when a publisher's site blocks reading. |
 | Styling | Plain CSS (`app/globals.css`) | A few colors and shapes; light and dark mode follow your system |
 
 **What happens when you add something:**
 
 1. It's saved and shows up right away with a pulsing dot.
-2. For a link, the app reads the page's title. YouTube and Vimeo titles come from their oEmbed service.
-3. For a document, its text is pulled out. For an image, the vision model looks at it, if installed.
-4. Wordle scores go straight to **Wordle**. Everything else goes to the local AI, which picks a category (or makes a new one) and writes a short title.
+2. For a link, the app reads the page's title and article text. YouTube and Vimeo titles come from their oEmbed service, and research papers from Crossref.
+3. For a document, its text is pulled out. For an image, a model that can see images describes it.
+4. Wordle scores go straight to **Wordle**. Everything else goes to the local AI, which picks a category (or makes a new one) and writes a short title and a summary.
 5. If Ollama is off, simple keyword rules pick a category, and the AI redoes it later.
 
 ## Where things are
@@ -176,7 +181,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | `lib/ollama.ts` | Talks to Ollama |
 | `lib/link.ts` | Reads a link's title and description (cached) |
 | `lib/files.ts` | Saves uploads and pulls text out of documents |
-| `components/ItemView.tsx` | The full view that opens when you click an item |
+| `components/ItemView.tsx` | The tray view: content, summary, and notes, all editable |
 | `app/api/` | Server routes: `items` (list, add, change, delete), `files` (serve uploads), `status` |
 | `prisma/schema.prisma` | The data model |
 | `data/` | Your database and uploads (not in git) |

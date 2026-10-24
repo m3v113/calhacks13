@@ -1,3 +1,5 @@
+import { Readability } from "@mozilla/readability";
+import { parseHTML } from "linkedom";
 import { db } from "./db";
 
 export function firstUrl(text: string) {
@@ -30,7 +32,7 @@ async function oembed(url: string) {
     const r = await fetch(base + encodeURIComponent(url), { signal: AbortSignal.timeout(5000) });
     if (!r.ok) return null;
     const j = await r.json();
-    return typeof j.title === "string" ? { title: j.title as string, summary: j.author_name ? `Video by ${j.author_name}` : null } : null;
+    return typeof j.title === "string" ? { title: j.title as string, summary: j.author_name ? `Video by ${j.author_name}` : null, text: null } : null;
   } catch {
     return null;
   }
@@ -54,24 +56,41 @@ async function paper(url: string) {
     if (typeof title !== "string") return null;
     const journal = work["container-title"]?.[0];
     const year = work.issued?.["date-parts"]?.[0]?.[0];
-    return { title: decode(title.replace(/<[^>]+>/g, "")), summary: [journal, year].filter(Boolean).join(", ") || null };
+    // Many papers include their abstract (with JATS markup); it's the best text to summarize from.
+    const abstract = typeof work.abstract === "string" ? decode(work.abstract.replace(/<[^>]+>/g, " ")) : null;
+    return { title: decode(title.replace(/<[^>]+>/g, "")), summary: [journal, year].filter(Boolean).join(", ") || null, text: abstract };
   } catch {
     return null;
   }
 }
 
-// Reads a page's title and description once, then serves it from the cache.
+// The readable text of an article page (menus, ads, and footers removed), done locally.
+function readable(html: string) {
+  try {
+    const { document } = parseHTML(html);
+    const article = new Readability(document as unknown as Document).parse()?.content ?? "";
+    // Keep paragraph breaks: end each block with a new line before dropping the tags.
+    const text = article.replace(/<\/(p|h[1-6]|li|div|blockquote|pre|tr)>|<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
+    return text.split("\n").map((l) => decode(l)).filter(Boolean).join("\n").slice(0, 20_000) || null;
+  } catch {
+    return null;
+  }
+}
+
+// Reads a page's title, description, and text once, then serves it from the cache.
 // Reads that found no title are retried after an hour (e.g. when you were offline).
 export async function readLink(url: string) {
   const cached = await db.pageCache.findUnique({ where: { url } });
-  if (cached && (cached.title || Date.now() - cached.fetchedAt.getTime() < 3600_000)) return cached;
+  // text is null only on pages cached before text was read; read those once more.
+  if (cached && ((cached.title && cached.text !== null) || (!cached.title && Date.now() - cached.fetchedAt.getTime() < 3600_000))) return cached;
 
   let title: string | null = null;
   let summary: string | null = null;
+  let text: string | null = null;
   let ok = false;
   const embed = (await oembed(url)) ?? (await paper(url));
   if (embed) {
-    ({ title, summary } = embed);
+    ({ title, summary, text } = embed);
     ok = true;
   } else try {
     const r = await fetch(url, {
@@ -80,12 +99,13 @@ export async function readLink(url: string) {
       signal: AbortSignal.timeout(5000),
     });
     if (r.ok && (r.headers.get("content-type") ?? "").includes("html")) {
-      const html = (await r.text()).slice(0, 300_000);
+      const html = (await r.text()).slice(0, 1_500_000);
       title = meta(html, "og:title") ?? (html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ? decode(html.match(/<title[^>]*>([^<]*)<\/title>/i)![1]) : null);
       summary = meta(html, "og:description") ?? meta(html, "description");
+      text = readable(html);
       ok = true;
     }
   } catch {}
-  const data = { title: title?.slice(0, 200) ?? null, summary: summary?.slice(0, 500) ?? null, ok, fetchedAt: new Date() };
+  const data = { title: title?.slice(0, 200) ?? null, summary: summary?.slice(0, 500) ?? null, text: text ?? "", ok, fetchedAt: new Date() };
   return db.pageCache.upsert({ where: { url }, create: { url, ...data }, update: data });
 }

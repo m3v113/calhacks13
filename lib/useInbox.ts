@@ -102,5 +102,5 @@ export function useInbox() {
     load();
   }, [load]);
 
-  return { categories, items, ai, vision, add, upload, setCategory, newCategory, archive, remove };
+  return { categories, items, ai, vision, add, upload, setCategory, newCategory, archive, remove, refresh: load };
 }

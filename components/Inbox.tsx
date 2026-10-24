@@ -169,10 +169,8 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
         {heading && <div className="title">{heading}</div>}
         {showText && <div className={heading ? "text sub" : "text"}>{text}</div>}
         {item.kind === "link" && !heading && <div className="text">{item.url ?? text}</div>}
-        {item.url && <a className="host" href={item.url} target="_blank" rel="noreferrer">{host(item.url)}</a>}
-        {item.kind === "document" && !pending && item.title !== item.fileName && (
-          <a className="host" href={`/api/files/${item.id}`} target="_blank" rel="noreferrer">{item.fileName}</a>
-        )}
+        {item.url && <div className="host">{host(item.url)}</div>}
+        {item.kind === "document" && !pending && item.title !== item.fileName && <div className="host">{item.fileName}</div>}
       </div>
       {item.kind === "image" && !item.id.startsWith("tmp-") && (
         <span className="thumb"><img src={`/api/files/${item.id}`} alt="" /></span>
