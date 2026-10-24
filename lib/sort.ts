@@ -104,7 +104,9 @@ export async function sortItem(id: string) {
     const page = await readLink(url);
     // Older TikTok reads stored the entire caption as PageCache.title. Treat that as
     // source content, not an authoritative display title, so AI can shorten it.
-    const captionAsTitle = page.via?.startsWith("tiktok") && page.title && page.text && page.text.startsWith(page.title);
+    const captionAsTitle =
+      (page.via?.startsWith("tiktok") && page.title && page.text && page.text.startsWith(page.title)) ||
+      (page.via === "brightdata" && page.title && /\bon Instagram:\s*["“]/i.test(page.title));
     if (page.title && !captionAsTitle && !title) { title = page.title; pageTitle = true; }
     else if (page.title && !captionAsTitle) pageTitle = item.kind === "link";
     summary = page.summary;

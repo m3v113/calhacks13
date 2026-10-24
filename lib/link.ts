@@ -8,7 +8,8 @@ export function firstUrl(text: string) {
 
 const decode = (s: string) =>
   s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/\s+/g, " ").trim();
+    .replace(/&nbsp;/gi, " ").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))).replace(/\s+/g, " ").trim();
 
 function meta(html: string, key: string) {
   const re = new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]*>`, "i");
@@ -36,9 +37,14 @@ const OEMBED: [RegExp, string][] = [
 ];
 
 const isTikTokHost = (host: string) => host === "tiktok.com" || host.endsWith(".tiktok.com");
+const isInstagramHost = (host: string) => host === "instagram.com" || host.endsWith(".instagram.com");
 
 function isTikTokUrl(url: string) {
   try { return isTikTokHost(new URL(url).hostname); } catch { return false; }
+}
+
+function isInstagramUrl(url: string) {
+  try { return isInstagramHost(new URL(url).hostname); } catch { return false; }
 }
 
 function tiktokCanonicalUrl(url: string) {
@@ -166,13 +172,26 @@ const BROWSER = {
   "accept-language": "en-US,en;q=0.9",
 };
 
+// Instagram sometimes returns a 200 page containing its logged-out error shell instead
+// of the requested post. Treat that as a failed read so Bright Data can try the URL.
+function instagramErrorPage(html: string) {
+  return /"pageID"\s*:\s*"httpErrorPage"|Page Not Found|show_lox_redesigned_404_page/i.test(html);
+}
+
 // Fetches a page's HTML ourselves. Some sites (like allrecipes) turn away requests that don't look like a
 // browser, and their pages are big and slow, so ask like a browser and allow time to download it all.
 async function direct(url: string) {
   try {
     const r = await fetch(url, { headers: BROWSER, redirect: "follow", signal: AbortSignal.timeout(12000) });
     if (!r.ok) console.warn(`[link] couldn't read ${url}: HTTP ${r.status}`);
-    if (r.ok && (r.headers.get("content-type") ?? "").includes("html")) return (await r.text()).slice(0, 1_500_000);
+    if (r.ok && (r.headers.get("content-type") ?? "").includes("html")) {
+      const html = (await r.text()).slice(0, 1_500_000);
+      if (isInstagramUrl(url) && instagramErrorPage(html)) {
+        console.warn(`[link] Instagram returned an error shell for ${url}`);
+        return null;
+      }
+      return html;
+    }
   } catch (e) {
     console.warn(`[link] couldn't read ${url}:`, (e as Error).message);
   }
