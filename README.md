@@ -31,21 +31,13 @@ Ollama runs AI models on your computer.
 
 1. Download it from [ollama.com/download](https://ollama.com/download), open the file, and drag Ollama into Applications.
 2. Open the Ollama app. A small llama icon appears in the menu bar at the top of the screen, which means it's running.
-3. In Terminal, download the model the inbox uses (about 2 GB):
-
-   ```bash
-   ollama pull llama3.2:3b
-   ```
-
-4. **For images:** to have screenshots and photos read and sorted by what's in them, download the image model too (about 3 GB):
+3. In Terminal, download the model the app uses (about 3 GB). It sorts and titles items, writes summaries, and reads images, so it's the only one you need:
 
    ```bash
    ollama pull gemma3:4b
    ```
 
-   The app uses `gemma3:4b` for images. If it isn't installed, it falls back to any other installed model that can see images. Without one, images are only sorted by their file name, and they're re-read on their own once the model is installed.
-
-   > Don't use `llama3.2-vision`. Ollama dropped support for it in version 0.30 ("unknown model architecture: 'mllama'"), and updating doesn't bring it back. If you have it, `ollama rm llama3.2-vision` frees 8 GB.
+   > Don't use `llama3.2-vision`. Ollama dropped support for it in version 0.30 ("unknown model architecture: 'mllama'"), and updating doesn't bring it back. If you have it, `ollama rm llama3.2-vision` frees 8 GB. `llama3.2:3b` isn't needed anymore either.
 
 ### 3. Get the code
 
@@ -121,8 +113,8 @@ npm run dev       # also updates the database to match
 |---|---|---|
 | `DATABASE_URL` | `file:../data/app.db` | Where your data is stored |
 | `OLLAMA_URL` | `http://localhost:11434` | Where Ollama is running |
-| `OLLAMA_MODEL` | `llama3.2:3b` | Model used to sort and title items |
-| `OLLAMA_VISION_MODEL` | `gemma3:4b` | Model used to read images. If it isn't installed, the smallest other model that can see images is used. |
+| `OLLAMA_MODEL` | `gemma3:4b` | Model used to sort, title, and summarize items |
+| `OLLAMA_VISION_MODEL` | same as `OLLAMA_MODEL` | Model used to read images. If it isn't installed, the smallest other model that can see images is used. |
 
 Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 
@@ -134,7 +126,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 |---|---|
 | `command not found: node` or `npm` | Node.js isn't installed, or Terminal was open during the install. Install it (step 1) and reopen Terminal. |
 | `command not found: ollama` | Open the Ollama app once; it adds the command. Then reopen Terminal. |
-| The dot stays yellow | Open the Ollama app, and check that `ollama list` shows `llama3.2:3b`. |
+| The dot stays yellow | Open the Ollama app, and check that `ollama list` shows `gemma3:4b`. If your `.env` is from before the switch, change `OLLAMA_MODEL` in it to `"gemma3:4b"`. |
 | Everything lands in "Other" | Usually Ollama isn't running. Start it and the inbox re-sorts within a minute. |
 | An image only shows its file name | No working image model. Run `ollama pull gemma3:4b`, then wait a couple of minutes. The Terminal shows `[sort] image model … failed` with the reason if one is installed but broken. |
 | A summary never appears | Check the Terminal for `[sort] AI failed`. Summaries need Ollama running. A link whose page can't be read gets no summary, but you can write one. |
