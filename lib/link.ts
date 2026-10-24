@@ -32,7 +32,7 @@ async function oembed(url: string) {
     const r = await fetch(base + encodeURIComponent(url), { signal: AbortSignal.timeout(5000) });
     if (!r.ok) return null;
     const j = await r.json();
-    return typeof j.title === "string" ? { title: j.title as string, summary: j.author_name ? `Video by ${j.author_name}` : null, text: null } : null;
+    return typeof j.title === "string" ? { title: j.title as string, summary: j.author_name ? `Video by ${j.author_name}` : null, text: null, via: "oembed" } : null;
   } catch {
     return null;
   }
@@ -58,7 +58,7 @@ async function paper(url: string) {
     const year = work.issued?.["date-parts"]?.[0]?.[0];
     // Many papers include their abstract (with JATS markup); it's the best text to summarize from.
     const abstract = typeof work.abstract === "string" ? decode(work.abstract.replace(/<[^>]+>/g, " ")) : null;
-    return { title: decode(title.replace(/<[^>]+>/g, "")), summary: [journal, year].filter(Boolean).join(", ") || null, text: abstract };
+    return { title: decode(title.replace(/<[^>]+>/g, "")), summary: [journal, year].filter(Boolean).join(", ") || null, text: abstract, via: "crossref" };
   } catch {
     return null;
   }
@@ -117,9 +117,23 @@ async function unlocked(url: string) {
   return null;
 }
 
-// Reads a page's title, description, and text once, then serves it from the cache.
-// Reads that found no title are retried after an hour (e.g. when you were offline).
-export async function readLink(url: string) {
+// Bright Data is paid, so each page gets at most this many tries with it, ever.
+const UNLOCK_TRIES = 2;
+const reading = new Map<string, ReturnType<typeof read>>();
+
+// Reads a page's title, description, and text once, then serves it from the cache: a page that was read
+// is never fetched again. Reads that failed are retried after an hour (e.g. when you were offline).
+export function readLink(url: string) {
+  // Two sorts asking for the same page at once share one read.
+  let r = reading.get(url);
+  if (!r) {
+    r = read(url).finally(() => reading.delete(url));
+    reading.set(url, r);
+  }
+  return r;
+}
+
+async function read(url: string) {
   const cached = await db.pageCache.findUnique({ where: { url } });
   // text is null only on pages cached before text was read; read those once more.
   if (cached && ((cached.title && cached.text !== null) || (!cached.title && Date.now() - cached.fetchedAt.getTime() < 3600_000))) return cached;
@@ -128,12 +142,21 @@ export async function readLink(url: string) {
   let summary: string | null = null;
   let text: string | null = null;
   let ok = false;
+  let via: string | null = null;
+  let unlockTries = cached?.unlockTries ?? 0;
   const embed = (await oembed(url)) ?? (await paper(url));
   if (embed) {
-    ({ title, summary, text } = embed);
+    ({ title, summary, text, via } = embed);
     ok = true;
   } else {
-    const html = (await direct(url)) ?? (await unlocked(url));
+    // Bright Data only as a last resort: after our own read fails, and only a couple of times per page.
+    let html = await direct(url);
+    if (html) via = "direct";
+    else if (process.env.BRIGHTDATA_API_KEY && unlockTries < UNLOCK_TRIES) {
+      unlockTries++;
+      html = await unlocked(url);
+      if (html) { via = "brightdata"; console.log(`[link] read ${url} with Bright Data`); }
+    }
     if (html) {
       title = meta(html, "og:title") ?? (html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ? decode(html.match(/<title[^>]*>([^<]*)<\/title>/i)![1]) : null);
       summary = meta(html, "og:description") ?? meta(html, "description");
@@ -141,6 +164,6 @@ export async function readLink(url: string) {
       ok = true;
     }
   }
-  const data = { title: title?.slice(0, 200) ?? null, summary: summary?.slice(0, 500) ?? null, text: text ?? "", ok, fetchedAt: new Date() };
+  const data = { title: title?.slice(0, 200) ?? null, summary: summary?.slice(0, 500) ?? null, text: text ?? "", ok, via, unlockTries, fetchedAt: new Date() };
   return db.pageCache.upsert({ where: { url }, create: { url, ...data }, update: data });
 }

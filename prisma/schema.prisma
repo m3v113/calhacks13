@@ -69,5 +69,7 @@ model PageCache {
   summary   String?
   text      String? // readable page text ("" when there was none); used for summaries
   ok        Boolean  @default(true)
+  via       String? // how it was read: "direct", "brightdata", "oembed", or "crossref"
+  unlockTries Int    @default(0) // Bright Data requests made for this page (it's paid, so capped)
   fetchedAt DateTime @default(now())
 }

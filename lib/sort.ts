@@ -173,7 +173,8 @@ let linksChecked = false;
 async function clearGuessedLinkTitles() {
   linksChecked = true;
   // Forget failed page reads too, so the new readers (like Crossref) get a chance right away.
-  await db.pageCache.deleteMany({ where: { title: null } });
+  // (Pages already tried with Bright Data keep their row, so its try count isn't reset.)
+  await db.pageCache.deleteMany({ where: { title: null, unlockTries: 0 } });
   await db.item.updateMany({ where: { kind: "link", title: null }, data: { updatedAt: new Date(0) } });
   const links = await db.item.findMany({ where: { kind: "link", NOT: { title: null } }, select: { id: true, url: true, title: true } });
   for (const l of links) {
