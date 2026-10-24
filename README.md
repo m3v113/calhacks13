@@ -89,8 +89,10 @@ Hover over any icon to see what it does.
 - **Add a note:** type in the box and press **Enter**. **Shift + Enter** adds a new line.
 - **Add a link, image, or document:** press **+** and pick one. You can also drag files onto the inbox or paste an image.
 - **Open an item (a "tray"):** click it. The AI summary is on the left, the item itself (the note, image, PDF, or video) is in the middle, and your own notes are on the right. Everything is editable and saves as you type: click the title, note, summary, or notes to change them. The ↻ button next to Summary writes a fresh one. Links only open when you click the link inside the tray. Press **Esc** or click outside to close.
-- **Move an item to another category:** drag it onto a category on the left. Or click its colored dot or category name, then pick a category, or type a new name in **New** and press Enter.
+- **Move an item to another category:** drag it onto a category on the left. Or click its colored dot or category name (in the list, or at the top of an open tray), then pick a category, or type a new name in **New** and press Enter.
 - **Make a new category:** type a name in **New** under the categories on the left and press Enter. Then drag items onto it.
+- **Rename, recolor, or delete a category:** hover over it on the left and click **⋯**. Type a new name and press Enter, or pick a color. Deleting a category doesn't delete its items: they're sorted again.
+- **The AI learns from your moves:** when you move an item to another category, the AI sees that the next time it sorts something similar. It also sees every category (including ones you made) and a few items already in each, so it knows what each one is for.
 - **Delete an item:** hover over it and click the trash icon. This deletes it for good, including any uploaded file.
 - **Hub:** drag the background or scroll with two fingers to move around. Pinch (or hold Ctrl and scroll) to zoom. The button at the top right shows or hides the inbox.
 
@@ -170,7 +172,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 1. It's saved and shows up right away with a pulsing dot.
 2. For a link, the app reads the page's title and article text. YouTube and Vimeo titles come from their oEmbed service, and research papers from Crossref.
 3. For a document, its text is pulled out. For an image, a model that can see images describes it.
-4. Wordle scores go straight to **Wordle**. Everything else goes to the local AI, which picks a category (or makes a new one) and writes a short title and a summary.
+4. Wordle scores go straight to **Wordle**. Everything else goes to the local AI, which picks a category (or makes a new one) and writes a short title and a summary. To pick, it sees each category with a few items already in it, plus the last 30 items you moved yourself.
 5. If Ollama is off, simple keyword rules pick a category, and the AI redoes it later.
 
 ## Where things are
@@ -188,7 +190,8 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | `lib/link.ts` | Reads a link's title and description (cached) |
 | `lib/files.ts` | Saves uploads and pulls text out of documents |
 | `components/ItemView.tsx` | The tray view: summary, content, and notes, all editable |
-| `app/api/categories/route.ts` | Makes a new category |
+| `app/api/categories/` | Make, rename, recolor, and delete categories |
+| `lib/colors.ts` | Category colors |
 | `app/api/` | Server routes: `items` (list, add, change, delete), `files` (serve uploads), `status` |
 | `prisma/schema.prisma` | The data model |
 | `data/` | Your database and uploads (not in git) |

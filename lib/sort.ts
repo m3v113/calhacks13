@@ -30,9 +30,10 @@ const SCHEMA = {
 };
 
 const SYSTEM = `You organize items in a personal inbox. For each item, give a category, a short title, and a summary.
-category: pick the single best category from the existing list when one fits.
+category: pick the single best category from the existing list when one fits. Check every existing category, including empty ones and ones the user made; their names and the items already in them show what belongs there.
 If none fits, invent a new category: 1 or 2 words, Title Case, plural when natural (e.g. "Books", "Travel", "Home Repairs").
 Use "Other" only when the item is meaningless. Wordle scores always go in "Wordle".
+If the user moved similar items to a category, use that category.
 title: 2 to 6 words that say what the item is, in Title Case, no quotes or trailing punctuation (e.g. "Grandma's Banana Bread", "Maya's Birthday Party").
 summary: 1 to 3 plain sentences on what the item is and the key details (dates, amounts, steps, findings).
 Only use facts that appear in the item. If there is little to go on, write one short sentence. Never invent details.
@@ -43,6 +44,31 @@ Say what kind of image it is (photo, screenshot, receipt, game, chart...). Copy 
 
 const cleanTitle = (t: string) => t.replace(/^["'\s]+|["'.\s]+$/g, "").replace(/\s+/g, " ").slice(0, 80);
 const cleanSummary = (t: string) => t.replace(/\s+/g, " ").trim().slice(0, 1200) || null;
+
+// Every category, including ones you made, with a few of the items already in it, so the AI knows what each one holds.
+async function existingCategories(exceptId: string) {
+  const cats = await db.category.findMany({
+    orderBy: { createdAt: "asc" },
+    select: { name: true, items: { where: { archived: false, NOT: { id: exceptId } }, orderBy: { updatedAt: "desc" }, take: 4, select: { title: true, text: true, fileName: true } } },
+  });
+  const lines = cats.map((c) => {
+    const examples = c.items.map((i) => `"${(i.title ?? i.fileName ?? i.text).replace(/\s+/g, " ").slice(0, 60)}"`);
+    return `- ${c.name}${examples.length ? `: ${examples.join(", ")}` : " (empty)"}`;
+  });
+  return `Existing categories, with items already in them:\n${lines.join("\n")}\n`;
+}
+
+// Items you moved to a category yourself, most recent first, so the AI puts similar items in the same place.
+async function yourMoves(exceptId: string) {
+  const moved = await db.item.findMany({
+    where: { sortedBy: "user", archived: false, NOT: [{ id: exceptId }, { categoryId: null }] },
+    orderBy: { updatedAt: "desc" }, take: 30,
+    select: { title: true, text: true, fileName: true, category: { select: { name: true } } },
+  });
+  if (!moved.length) return "";
+  const lines = moved.map((m) => `- "${(m.title ?? m.fileName ?? m.text).replace(/\s+/g, " ").slice(0, 80)}" → ${m.category!.name}`);
+  return `\nThe user moved these items to these categories. Put similar items in the same category:\n${lines.join("\n")}\n`;
+}
 
 // Reads the link or file, then sorts, titles, and summarizes the item with AI, falling back to rules.
 // The category is only chosen once (by AI, or by you); later runs just fill in the title and summary.
@@ -108,8 +134,7 @@ export async function sortItem(id: string) {
         pageText && `Page text:\n${pageText.slice(0, 6000)}`,
         item.extracted && `Document text:\n${item.extracted.slice(0, 6000)}`,
       ].filter(Boolean).join("\n");
-      const existing = (await db.category.findMany({ orderBy: { createdAt: "asc" } })).map((c) => c.name);
-      const a = await chatJSON(SYSTEM, `Existing categories: ${existing.join(", ")}\n\nItem:\n${content.slice(0, 14000)}`, SCHEMA, isAnswer);
+      const a = await chatJSON(SYSTEM, `${await existingCategories(id)}\n${await yourMoves(id)}\nItem:\n${content.slice(0, 14000)}`, SCHEMA, isAnswer);
       // Without a vision model, an image is only known by its file name: sort it, but don't title or summarize it yet.
       const blind = item.kind === "image" && !seen;
       name = a.category;

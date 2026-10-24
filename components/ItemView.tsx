@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Category, useInbox } from "@/lib/useInbox";
 import { CloseIcon, OpenIcon, RefreshIcon, TrashIcon } from "./Icons";
+import { Menu } from "./Inbox";
 
 type Inbox = ReturnType<typeof useInbox>;
 type Full = {
@@ -53,6 +54,7 @@ function Field({ value, onSave, className, placeholder, label }: {
 // The tray view: the summary on the left, the item in the middle, your notes on the right. Everything saves as you type.
 export default function ItemView({ id, inbox, onClose }: { id: string; inbox: Inbox; onClose: () => void }) {
   const [item, setItem] = useState<Full | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/items/${id}`, { cache: "no-store" });
@@ -93,8 +95,13 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="tray" role="dialog" aria-modal="true" aria-label={item?.title ?? "Item"}>
         <div className="tray-top">
-          {item?.category && (
-            <span className="chip"><span className="dot" style={{ background: item.category.color }} />{item.category.name}</span>
+          {item && (
+            <span className="pick-cat">
+              <button className="chip" onClick={() => setPicking(!picking)} aria-label="Change category" aria-expanded={picking}>
+                <span className="dot" style={{ background: item.category?.color ?? "var(--line)" }} />{item.category?.name ?? "Sorting…"}
+              </button>
+              {picking && <Menu inbox={inbox} item={{ id: item.id, categoryId: item.category?.id ?? null }} onClose={() => setPicking(false)} onPicked={load} />}
+            </span>
           )}
           <span className="grow" />
           {item && (

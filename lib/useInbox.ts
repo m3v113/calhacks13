@@ -91,6 +91,22 @@ export function useInbox() {
 
   const newCategory = useCallback((id: string, categoryName: string) => patch(id, { categoryName }), [patch]);
 
+  // Rename or recolor a category. Returns false when the name is already taken.
+  const editCategory = useCallback(async (id: string, change: { name?: string; color?: string }) => {
+    setCategories((cs) => cs.map((c) => (c.id === id ? { ...c, ...change } : c)));
+    const r = await fetch(`/api/categories/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(change) });
+    load();
+    return r.ok;
+  }, [load]);
+
+  // Delete a category; its items get sorted again.
+  const deleteCategory = useCallback(async (id: string) => {
+    setCategories((cs) => cs.filter((c) => c.id !== id));
+    setItems((xs) => xs.map((i) => (i.categoryId === id ? { ...i, categoryId: null, sortedBy: "pending" } : i)));
+    await fetch(`/api/categories/${id}`, { method: "DELETE" });
+    load();
+  }, [load]);
+
   const createCategory = useCallback(async (name: string) => {
     await fetch("/api/categories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) });
     load();
@@ -107,5 +123,5 @@ export function useInbox() {
     load();
   }, [load]);
 
-  return { categories, items, ai, vision, add, upload, setCategory, newCategory, createCategory, archive, remove, refresh: load };
+  return { categories, items, ai, vision, add, upload, setCategory, newCategory, createCategory, editCategory, deleteCategory, archive, remove, refresh: load };
 }

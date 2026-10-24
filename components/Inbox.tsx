@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Category, Item, useInbox } from "@/lib/useInbox";
-import { DocIcon, ImageIcon, LinkIcon, NoteIcon, PlusIcon, TrashIcon } from "./Icons";
+import { DocIcon, ImageIcon, LinkIcon, MoreIcon, NoteIcon, PlusIcon, TrashIcon } from "./Icons";
+import { COLORS } from "@/lib/colors";
 import ItemView from "./ItemView";
 
 type Inbox = ReturnType<typeof useInbox>;
@@ -12,6 +13,7 @@ const DRAG = "application/x-inbox-item";
 export function Categories({ inbox, selected, onSelect, chips }: { inbox: Inbox; selected: string | null; onSelect: (id: string | null) => void; chips?: boolean }) {
   const [over, setOver] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
   // The list shows every category, so a new one has a place to drop things into. The chips only show the ones in use.
   const shown = chips ? inbox.categories.filter((c) => c.count > 0 || c.id === selected) : inbox.categories;
   const total = inbox.items.length;
@@ -30,12 +32,21 @@ export function Categories({ inbox, selected, onSelect, chips }: { inbox: Inbox;
         </button>
       </li>
       {shown.map((c) => (
-        <li key={c.id}>
+        <li key={c.id} className={chips ? undefined : "cat"}>
           <button className={`${selected === c.id ? "on" : ""} ${over === c.id ? "over" : ""}`} onClick={() => onSelect(c.id)} {...drop(c.id)}>
             <span className="dot" style={{ background: c.color }} />
             <span className="name">{c.name}</span>
             {!chips && <span className="count">{c.count || ""}</span>}
           </button>
+          {!chips && (
+            <button className={`more ${editing === c.id ? "shown" : ""}`} aria-label={`Edit ${c.name}`} onClick={() => setEditing(editing === c.id ? null : c.id)}>
+              <MoreIcon />
+            </button>
+          )}
+          {editing === c.id && (
+            <EditCategory category={c} inbox={inbox} onClose={() => setEditing(null)}
+              onDeleted={() => { if (selected === c.id) onSelect(null); }} />
+          )}
         </li>
       ))}
       {!chips && (
@@ -54,6 +65,46 @@ export function Categories({ inbox, selected, onSelect, chips }: { inbox: Inbox;
         </li>
       )}
     </ul>
+  );
+}
+
+// Rename, recolor, or delete a category.
+function EditCategory({ category, inbox, onClose, onDeleted }: { category: Category; inbox: Inbox; onClose: () => void; onDeleted: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [name, setName] = useState(category.name);
+  const [taken, setTaken] = useState(false);
+
+  useEffect(() => {
+    const away = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && onClose();
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    setTimeout(() => document.addEventListener("mousedown", away));
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
+  }, [onClose]);
+
+  const rename = async () => {
+    const next = name.trim();
+    if (!next || next === category.name) return onClose();
+    if (await inbox.editCategory(category.id, { name: next })) onClose();
+    else setTaken(true);
+  };
+
+  return (
+    <div className="menu edit-cat" ref={ref}>
+      <input className="rename" value={name} aria-label="Category name" autoFocus
+        onChange={(e) => { setName(e.target.value); setTaken(false); }}
+        onKeyDown={(e) => e.key === "Enter" && rename()} onBlur={() => name.trim() !== category.name && rename()} />
+      {taken && <div className="taken">That name is taken</div>}
+      <div className="swatches">
+        {COLORS.map((color) => (
+          <button key={color} className={color === category.color ? "on" : ""} style={{ background: color }} aria-label={`Color ${color}`}
+            onClick={() => inbox.editCategory(category.id, { color })} />
+        ))}
+      </div>
+      <button className="danger" onClick={() => { inbox.deleteCategory(category.id); onDeleted(); onClose(); }}>
+        <TrashIcon />Delete
+      </button>
+    </div>
   );
 }
 
@@ -211,7 +262,7 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
   );
 }
 
-function Menu({ inbox, item, onClose }: { inbox: Inbox; item: Item; onClose: () => void }) {
+export function Menu({ inbox, item, onClose, onPicked }: { inbox: Inbox; item: Pick<Item, "id" | "categoryId">; onClose: () => void; onPicked?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [name, setName] = useState("");
 
@@ -226,7 +277,7 @@ function Menu({ inbox, item, onClose }: { inbox: Inbox; item: Item; onClose: () 
   return (
     <div className="menu" ref={ref}>
       {inbox.categories.map((c) => (
-        <button key={c.id} className={c.id === item.categoryId ? "on" : ""} onClick={() => { inbox.setCategory(item.id, c.id); onClose(); }}>
+        <button key={c.id} className={c.id === item.categoryId ? "on" : ""} onClick={() => { inbox.setCategory(item.id, c.id).then(onPicked); onClose(); }}>
           <span className="dot" style={{ background: c.color }} />
           {c.name}
         </button>
@@ -238,7 +289,7 @@ function Menu({ inbox, item, onClose }: { inbox: Inbox; item: Item; onClose: () 
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && name.trim()) {
-            inbox.newCategory(item.id, name.trim());
+            inbox.newCategory(item.id, name.trim()).then(onPicked);
             onClose();
           }
         }}
