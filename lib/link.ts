@@ -36,6 +36,30 @@ async function oembed(url: string) {
   }
 }
 
+// Research papers: publisher pages (ScienceDirect and others) often block simple fetches,
+// so look the paper up by its DOI or ScienceDirect PII in Crossref's free API instead.
+async function paper(url: string) {
+  const doi = decodeURIComponent(url).match(/\b10\.\d{4,9}\/[^\s?#&]+/)?.[0];
+  const pii = url.match(/sciencedirect\.com\/science\/article\/(?:abs\/)?pii\/(S?[\dX]+)/i)?.[1];
+  if (!doi && !pii) return null;
+  const api = doi
+    ? `https://api.crossref.org/works/${encodeURIComponent(doi)}`
+    : `https://api.crossref.org/works?rows=1&filter=alternative-id:${pii}`;
+  try {
+    const r = await fetch(api, { headers: { "user-agent": "ProjectScaffold/0.1" }, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return null;
+    const m = (await r.json()).message;
+    const work = doi ? m : m?.items?.[0];
+    const title = work?.title?.[0];
+    if (typeof title !== "string") return null;
+    const journal = work["container-title"]?.[0];
+    const year = work.issued?.["date-parts"]?.[0]?.[0];
+    return { title: decode(title.replace(/<[^>]+>/g, "")), summary: [journal, year].filter(Boolean).join(", ") || null };
+  } catch {
+    return null;
+  }
+}
+
 // Reads a page's title and description once, then serves it from the cache.
 // Reads that found no title are retried after an hour (e.g. when you were offline).
 export async function readLink(url: string) {
@@ -45,7 +69,7 @@ export async function readLink(url: string) {
   let title: string | null = null;
   let summary: string | null = null;
   let ok = false;
-  const embed = await oembed(url);
+  const embed = (await oembed(url)) ?? (await paper(url));
   if (embed) {
     ({ title, summary } = embed);
     ok = true;

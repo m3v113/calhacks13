@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { unlink } from "node:fs/promises";
 import { db, categoryByName } from "@/lib/db";
+import { fullPath } from "@/lib/files";
 
 // Change an item's category (existing id or a new name), or archive it.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -23,4 +25,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   } catch {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
+}
+
+// One item with everything, for the full view.
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const item = await db.item.findUnique({ where: { id }, include: { category: true } });
+  return item ? NextResponse.json(item) : NextResponse.json({ error: "not found" }, { status: 404 });
+}
+
+// Deletes an item for good, along with its uploaded file.
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const item = await db.item.findUnique({ where: { id } });
+  if (!item) return NextResponse.json({ error: "not found" }, { status: 404 });
+  await db.item.delete({ where: { id } });
+  if (item.filePath) await unlink(fullPath(item.filePath)).catch(() => {});
+  return NextResponse.json({ ok: true });
 }
