@@ -5,7 +5,7 @@ A home for messy personal projects that runs entirely on your own computer.
 - **Hub** (`/`): an infinite canvas that will hold your projects, with the Smart Inbox on the side.
 - **Smart Inbox** (`/inbox`): drop in anything (notes, links, images, documents). Local AI sorts each item into a category and gives it a short title.
 
-Everything is stored in one file on your computer, and the AI runs locally with [Ollama](https://ollama.com). No account, no API key, and nothing leaves your machine except reading the links you add.
+Everything is stored in one file on your computer, and the AI runs locally with [Ollama](https://ollama.com). No account and no API key are needed, and nothing leaves your machine except reading the links you add. (One optional exception: if you set up Bright Data, the addresses of sites that block reading are sent to it. See [Settings](#settings-env).)
 
 > Names are working names and may change. They all live in `lib/names.ts`.
 
@@ -61,6 +61,8 @@ npm install             # downloads the app's libraries (a minute or two)
 npm run setup           # creates the local database in data/app.db
 ```
 
+**Optional:** to read sites that block apps (like allrecipes), add a Bright Data key to `.env`. See [Settings](#settings-env). Everything else works without it.
+
 ### 5. Start the app
 
 ```bash
@@ -103,10 +105,15 @@ Hover over any icon to see what it does.
 When there are new changes on GitHub:
 
 ```bash
+git checkout main # if you were trying out a pull request's branch
 git pull
 npm install       # only needed if new libraries were added; safe to run anyway
 npm run dev       # also updates the database to match
 ```
+
+- If the page still looks old, hard refresh the browser with **⌘ + Shift + R**.
+- New settings show up in `.env.example`. Your `.env` isn't changed by `git pull`, so copy over any new lines you want. For example, `OLLAMA_MODEL` is now `"gemma3:4b"`.
+- If you were using an older model, run `ollama pull gemma3:4b` (see step 2).
 
 ### Trying a pull request before merging it
 
