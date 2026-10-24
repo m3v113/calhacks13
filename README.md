@@ -131,7 +131,7 @@ When you're done, stop the server (Ctrl+C) and go back with `git checkout main`.
 | `OLLAMA_URL` | `http://localhost:11434` | Where Ollama is running |
 | `OLLAMA_MODEL` | `gemma3:4b` | Model used to sort, title, and summarize items |
 | `OLLAMA_VISION_MODEL` | same as `OLLAMA_MODEL` | Model used to read images. If it isn't installed, the smallest other model that can see images is used. |
-| `BRIGHTDATA_API_KEY` | (none) | Optional. A [Bright Data](https://brightdata.com) API key, used as a backup to read sites that block the app (HTTP 403), like allrecipes. Only the addresses of those pages are sent to Bright Data. |
+| `BRIGHTDATA_API_KEY` | (none) | Optional. A [Bright Data](https://brightdata.com) API key, used as a backup to read sites that block the app (HTTP 403), like allrecipes. Only the addresses of those pages are sent to Bright Data. It's a last resort: it runs only after a normal read fails, a page that was read is saved and never fetched again, and each page gets at most 2 Bright Data tries. The Terminal shows `[link] read … with Bright Data` each time it's used. |
 | `BRIGHTDATA_ZONE` | `web_unlocker1` | The name of your Web Unlocker zone in Bright Data |
 
 **Setting up Bright Data (optional):** in the Bright Data dashboard, add a **Web Unlocker** zone (the default name is `web_unlocker1`), then copy your API key from **Account settings → API keys**. Put both in `.env` and restart the app. Links that failed before are read again on restart.
