@@ -58,13 +58,31 @@ model Project {
   color      String?
   canvasX    Float    @default(0)
   canvasY    Float    @default(0)
-  overview   String? // summary: written by the AI, editable by you
-  overviewBy String? // "ai" | "user"
+  cardW      Float    @default(260) // card size on the Hub
+  cardH      Float    @default(120)
+  kind       String   @default("space") // "space" (you work in it) | "auto" (the AI breaks it into steps)
+  overview   String? // no longer shown; kept so existing databases update without data loss
+  overviewBy String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   items    Item[]
   sections Section[]
+  linksOut ProjectLink[] @relation("from")
+  linksIn  ProjectLink[] @relation("to")
+}
+
+// A line between two projects on the Hub. Linked projects share their sources.
+model ProjectLink {
+  id        String   @id @default(cuid())
+  fromId    String
+  from      Project  @relation("from", fields: [fromId], references: [id], onDelete: Cascade)
+  toId      String
+  to        Project  @relation("to", fields: [toId], references: [id], onDelete: Cascade)
+  color     String?
+  createdAt DateTime @default(now())
+
+  @@unique([fromId, toId])
 }
 
 // A block in a project space
@@ -72,10 +90,11 @@ model Section {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  type      String // "tasks" | "notes" | "items" (linked inbox items) | "providers" (Service Scout)
+  type      String // "writing" | "tasks" | "sources" (older databases: "notes", "items", "providers")
   title     String
   order     Int      @default(0)
-  notes     String? // the text of a notes section
+  span      Int      @default(1) // 1 = half width, 2 = full width
+  notes     String? // the text of a writing section (HTML)
   createdAt DateTime @default(now())
 
   tasks Task[]
@@ -88,6 +107,8 @@ model Task {
   sectionId String
   section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   text      String
+  detail    String? // how to do it (steps in Auto projects)
+  proposed  Boolean  @default(false) // suggested by the AI and not yet approved
   done      Boolean  @default(false)
   order     Int      @default(0)
   createdAt DateTime @default(now())

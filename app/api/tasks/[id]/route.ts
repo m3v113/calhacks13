@@ -3,12 +3,14 @@ import { db } from "@/lib/db";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-// Check off or reword a task.
+// Check off, reword, or approve a task ({ proposed: false } keeps one the AI suggested).
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const data: Record<string, unknown> = {};
   if (typeof body.done === "boolean") data.done = body.done;
+  if (body.proposed === false) data.proposed = false;
+  if (typeof body.detail === "string") data.detail = body.detail.trim().slice(0, 600) || null;
   if (typeof body.text === "string" && body.text.trim()) data.text = body.text.trim().slice(0, 500);
   try {
     return NextResponse.json(await db.task.update({ where: { id }, data }));

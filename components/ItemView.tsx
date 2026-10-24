@@ -20,7 +20,7 @@ function ProjectPick({ item, onPicked }: { item: Full; onPicked: (project: Proje
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;
-    fetch("/api/projects", { cache: "no-store" }).then((r) => r.json()).then(setProjects).catch(() => {});
+    fetch("/api/projects", { cache: "no-store" }).then((r) => r.json()).then((d) => setProjects(d.projects)).catch(() => {});
     const away = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);

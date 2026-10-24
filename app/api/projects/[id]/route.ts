@@ -1,49 +1,59 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { COLORS } from "@/lib/colors";
-import { summarizeProject } from "@/lib/projects";
+import { planning, queuePlan, upgradeSections } from "@/lib/projects";
 
 type Ctx = { params: Promise<{ id: string }> };
+const ITEM = { where: { archived: false }, orderBy: { createdAt: "desc" as const }, omit: { extracted: true } };
+const BRIEF = { id: true, title: true, color: true };
 
-// A project with its sections, tasks, and linked inbox items.
+// A project with its sections, tasks, and sources, plus the sources of projects linked to it.
 export async function GET(_req: Request, { params }: Ctx) {
+  await upgradeSections();
   const { id } = await params;
   const project = await db.project.findUnique({
     where: { id },
+    omit: { overview: true, overviewBy: true },
     include: {
       sections: { orderBy: { order: "asc" }, include: { tasks: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] } } },
-      items: { where: { archived: false }, orderBy: { createdAt: "desc" }, omit: { extracted: true } },
+      items: ITEM,
+      linksOut: { include: { to: { select: { ...BRIEF, items: ITEM } } } },
+      linksIn: { include: { from: { select: { ...BRIEF, items: ITEM } } } },
     },
   });
-  return project ? NextResponse.json(project) : NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const { linksOut, linksIn, ...rest } = project;
+  const linked = [...linksOut.map((l) => l.to), ...linksIn.map((l) => l.from)];
+  return NextResponse.json({ ...rest, linked, planning: planning.has(id) });
 }
 
-// Edit a project: title, color, position on the Hub, summary, or { summarize: true } for a fresh one.
-// { order: [sectionId, ...] } reorders its sections.
+// Edit a project: title, color, kind, position and size on the Hub.
+// { order: [sectionId, ...] } reorders its sections; { plan: true } asks the AI for steps again.
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const data: Record<string, unknown> = {};
   if (typeof body.title === "string" && body.title.trim()) data.title = body.title.trim().slice(0, 60);
   if (typeof body.color === "string" && COLORS.includes(body.color)) data.color = body.color;
-  if (Number.isFinite(body.canvasX)) data.canvasX = body.canvasX;
-  if (Number.isFinite(body.canvasY)) data.canvasY = body.canvasY;
-  if (typeof body.overview === "string") Object.assign(data, body.overview.trim() ? { overview: body.overview.slice(0, 5000), overviewBy: "user" } : { overview: null, overviewBy: null });
-  if (body.summarize === true) Object.assign(data, { overview: null, overviewBy: null });
+  if (body.kind === "space" || body.kind === "auto") data.kind = body.kind;
+  for (const k of ["canvasX", "canvasY"]) if (Number.isFinite(body[k])) data[k] = body[k];
+  if (Number.isFinite(body.cardW)) data.cardW = Math.min(800, Math.max(180, body.cardW));
+  if (Number.isFinite(body.cardH)) data.cardH = Math.min(600, Math.max(72, body.cardH));
   try {
-    const project = await db.project.update({ where: { id }, data });
+    const project = await db.project.update({ where: { id }, data, omit: { overview: true, overviewBy: true } });
     if (Array.isArray(body.order)) {
       await db.$transaction(body.order.filter((s: unknown) => typeof s === "string").map((sid: string, order: number) =>
         db.section.updateMany({ where: { id: sid, projectId: id }, data: { order } })));
     }
-    if (body.summarize === true) after(() => summarizeProject(id));
+    if (body.plan === true) queuePlan(id, true);
+    else if (data.kind === "auto" && !(await db.task.count({ where: { section: { projectId: id } } }))) queuePlan(id);
     return NextResponse.json(project);
   } catch {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 }
 
-// Delete a project and its sections. Linked inbox items stay in the inbox.
+// Delete a project and its sections. Its sources stay in the inbox.
 export async function DELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
   await db.project.delete({ where: { id } }).catch(() => {});

@@ -8,8 +8,8 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** F3 + F4 projects are built and waiting for review in PR #6. Next is F5 Service Scout, which fills the "Help nearby" section using Bright Data.
-**Done:** F1 Smart Inbox (PR #5), F3 Projects on the Hub and F4 Project space (PR #6, in review).
+**Working on:** Projects round 2a (PR #7, in review): Auto vs Space, sections, Hub cards and links. Next is 2b, the Scouts engine (Find, Answer, Turn into), after Mehvish approves section 3 of `plans/Projects_v2_Plan.md`.
+**Done:** F1 Smart Inbox (PR #5), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
 
@@ -35,7 +35,8 @@ Ordered. Feature numbers match the plan.
 - [ ] Undo after deleting an item (F1)
 - [ ] Check Bright Data on the Mac: paste the allrecipes link, look for `[link] read … with Bright Data` (F1)
 - [ ] Service Scout with Bright Data SERP API + Web Unlocker (F5, Bright Data prize)
-- [ ] Try PR #6 on the Mac with gemma3:4b: make 2–3 projects and check the suggested sections and summary (F3, F4)
+- [ ] Try PR #7 on the Mac with gemma3:4b: make a Space and an Auto project and check the sections and proposed steps
+- [ ] Approve the Scouts design (plan section 3), then build 2b
 - [ ] Decide on Factory Droid SDK or Fetch.ai for the Scouts (F5)
 - [ ] Status dot shows offline too, not just AI on or off (F6)
 - [ ] Seed script for the demo
@@ -54,11 +55,46 @@ Ordered. Feature numbers match the plan.
 - [x] Trays: summaries, notes, editing, working images (2026-10-24, PR #3, merged)
 - [x] Side trays, New category and drag-to-tag in the sidebar (2026-10-24, PR #4, merged)
 - [x] Edit and delete categories, change category in a tray, AI learns from moves, Bright Data backup for blocked links, inbox final pass (2026-10-24, PR #5, merged)
-- [x] F3 + F4: project cards on the Hub, new project from one sentence, project space with tasks, notes, linked items, and summary, plus a project chip in the tray (2026-10-24, PR #6)
+- [x] F3 + F4: project cards on the Hub, new project from one sentence, project space with tasks, notes, linked items, and summary, plus a project chip in the tray (2026-10-24, PR #6, merged)
+- [x] Projects round 2a: Auto vs Space, Writing/Tasks/Sources sections in a grid, formatting, Sources that add to the inbox, bigger cards, links between projects (2026-10-24, PR #7)
 
 ---
 
 ## Log
+
+### 2026-10-24 · Projects round 2a (PR #7)
+
+Mehvish's feedback on PR #6 led to a new plan, `plans/Projects_v2_Plan.md` (not in the repo). This PR builds round 2a of it.
+
+- **Auto vs Space:** the AI guesses the kind and you switch it, both when you create a project and inside it.
+  - Space is a workspace you configure.
+  - In Auto, the local AI proposes 4–8 steps, each with a how-to line. You keep or drop each one (a dimmed step with ✓ and ×, or Keep all).
+  - Researched steps come with Scouts in 2c.
+- **Sections are Writing, Tasks, and Sources:**
+  - Old databases are upgraded on the first page load: notes → writing, items → sources, and help nearby is removed.
+  - Every project has exactly one Sources section.
+  - The AI suggests several Writing sections named for the project (Outline, Introduction, Literature Review...).
+  - The new-project box lets you change each section's type and name, remove sections, and add as many as you like.
+- **Writing sections** use TipTap (bold, italic, H1, H2, lists), with a toolbar that shows while you type. Old plain-text notes become paragraphs.
+- **Grid layout:** sections sit in two columns and can be half or full width.
+  - Drag a header onto another section's edge. Left or right puts them side by side, and top or bottom stacks them.
+  - Dragging now uses pointer events, because the old HTML drag-and-drop handle didn't work on Mehvish's browser.
+- **Sources:**
+  - Add a link, note, or file right there. It's also added to the inbox and sorted.
+  - The From inbox picker has category filter chips and groups results by category.
+  - Linked projects' sources show under their name.
+- **Summary removed** and replaced by an empty Scouts panel. The `overview` columns stay in the database so `prisma db push` doesn't need to drop data.
+- **Hub:**
+  - Cards are bigger (260×120) and can be resized from their corner. You can edit the title on the card and change the color from its square.
+  - The number on the card is gone. It counted linked items.
+  - Drag the circle on a card's right edge to another card to link the two projects. Lines can be recolored or removed.
+  - The palette grows to 20 colors, for categories too.
+- **Scouts design** (plan section 3, simplified after Mehvish asked): three general Scouts on one engine.
+  - **Find** gives options to compare.
+  - **Answer** gives a write-up with citations.
+  - **Turn into** reshapes pages or sources into tasks, citations, or tables.
+  - They use the Bright Data SERP API plus Web Unlocker (only for blocked pages), with a cap per run, a cache, and they run only when you press Run.
+- **Workflow:** `Journal.md` and `CLAUDE.md` are now in the repo (PR #6). Contributors read the journal but don't edit it, and Mehvish's Claude updates it with each merged PR.
 
 ### 2026-10-24 · Projects on the Hub and project spaces (PR #6)
 

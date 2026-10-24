@@ -18,7 +18,8 @@ export async function GET() {
   });
 }
 
-// Add a note or link (JSON: { text, kind? }) or a file (form data: file).
+// Add a note or link (JSON: { text, kind?, projectId? }) or a file (form data: file, projectId?).
+// With a projectId, the item is also one of that project's sources.
 export async function POST(req: Request) {
   if ((req.headers.get("content-type") ?? "").includes("multipart/form-data")) {
     const form = await req.formData().catch(() => null);
@@ -29,18 +30,24 @@ export async function POST(req: Request) {
     const filePath = await saveUpload(file);
     const kind = mime.startsWith("image/") ? "image" : "document";
     const extracted = kind === "document" ? await extractText(filePath, mime, file.name) : null;
-    const item = await db.item.create({ data: { kind, text: file.name, fileName: file.name, filePath, mime, extracted } });
+    const item = await db.item.create({ data: { kind, text: file.name, fileName: file.name, filePath, mime, extracted, projectId: await projectOf(form?.get("projectId")) } });
     after(() => sortItem(item.id));
     return NextResponse.json(item, { status: 201 });
   }
 
-  const { text, kind } = await req.json().catch(() => ({}));
+  const { text, kind, projectId } = await req.json().catch(() => ({}));
   const clean = typeof text === "string" ? text.trim().slice(0, 10_000) : "";
   if (!clean) return NextResponse.json({ error: "empty" }, { status: 400 });
   const url = firstUrl(clean);
   // Typing makes a note; a bare link (or one added as a link) makes a link.
   const isLink = url !== null && (kind === "link" || clean === url);
-  const item = await db.item.create({ data: { kind: isLink ? "link" : "note", text: clean, url } });
+  const item = await db.item.create({ data: { kind: isLink ? "link" : "note", text: clean, url, projectId: await projectOf(projectId) } });
   after(() => sortItem(item.id));
   return NextResponse.json(item, { status: 201 });
+}
+
+// A project id from the request, if that project exists.
+async function projectOf(id: unknown) {
+  if (typeof id !== "string" || !id) return null;
+  return (await db.project.findUnique({ where: { id }, select: { id: true } }))?.id ?? null;
 }

@@ -57,3 +57,9 @@ export const CheckIcon = () => (
 export const GripIcon = () => (
   <svg {...p}><circle cx="9" cy="6" r="1" fill="currentColor" /><circle cx="15" cy="6" r="1" fill="currentColor" /><circle cx="9" cy="12" r="1" fill="currentColor" /><circle cx="15" cy="12" r="1" fill="currentColor" /><circle cx="9" cy="18" r="1" fill="currentColor" /><circle cx="15" cy="18" r="1" fill="currentColor" /></svg>
 );
+export const WidthIcon = () => (
+  <svg {...p}><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4" /></svg>
+);
+export const UploadIcon = () => (
+  <svg {...p}><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></svg>
+);
