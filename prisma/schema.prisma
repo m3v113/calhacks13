@@ -41,7 +41,7 @@ model Item {
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   sortedBy   String    @default("pending") // "pending" | "rules" | "sure" | "ai" | "user"
   aiTries    Int       @default(0) // AI runs in a row that didn't produce a summary; retries stop at 3
-  projectId  String? // optional link to a project (F3)
+  projectId  String? // optional link to a project; it stays in its category too
   project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   archived   Boolean   @default(false)
   createdAt  DateTime  @default(now())
@@ -50,17 +50,49 @@ model Item {
   @@index([archived, createdAt])
 }
 
-// F2/F3: a project card on the Hub (UI comes later)
+// A project: a card on the Hub (F3) that opens to its own space (F4)
 model Project {
-  id        String   @id @default(cuid())
-  title     String
-  color     String?
-  canvasX   Float    @default(0)
-  canvasY   Float    @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  title      String
+  goal       String? // the sentence it was made from
+  color      String?
+  canvasX    Float    @default(0)
+  canvasY    Float    @default(0)
+  overview   String? // summary: written by the AI, editable by you
+  overviewBy String? // "ai" | "user"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  items Item[]
+  items    Item[]
+  sections Section[]
+}
+
+// A block in a project space
+model Section {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type      String // "tasks" | "notes" | "items" (linked inbox items) | "providers" (Service Scout)
+  title     String
+  order     Int      @default(0)
+  notes     String? // the text of a notes section
+  createdAt DateTime @default(now())
+
+  tasks Task[]
+
+  @@index([projectId, order])
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  sectionId String
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  text      String
+  done      Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([sectionId, order])
 }
 
 // Links read online, kept so nothing is fetched twice

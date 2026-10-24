@@ -12,6 +12,7 @@ export type Item = {
   url: string | null;
   title: string | null;
   categoryId: string | null;
+  projectId?: string | null;
   sortedBy: string;
   createdAt: string;
 };

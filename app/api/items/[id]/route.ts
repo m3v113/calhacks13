@@ -25,6 +25,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     data.sortedBy = "user";
   }
   if (typeof body.archived === "boolean") data.archived = body.archived;
+  // Link to a project, or unlink with null. The item keeps its category.
+  if (body.projectId === null || typeof body.projectId === "string") data.projectId = body.projectId;
 
   const title = text(body.title, 200);
   if (title !== undefined) Object.assign(data, title.trim() ? { title: title.trim(), titleBy: "user" } : { title: null, titleBy: null });
@@ -59,7 +61,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 // One item with everything, for the full view.
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const item = await db.item.findUnique({ where: { id }, include: { category: true } });
+  const item = await db.item.findUnique({ where: { id }, include: { category: true, project: { select: { id: true, title: true, color: true } } } });
   if (!item) return NextResponse.json({ error: "not found" }, { status: 404 });
   // A link's preview picture, from when its page was read.
   const page = item.url ? await db.pageCache.findUnique({ where: { url: item.url }, select: { image: true, via: true } }) : null;

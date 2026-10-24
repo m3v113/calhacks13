@@ -7,7 +7,7 @@ import ItemView from "./ItemView";
 
 type Inbox = ReturnType<typeof useInbox>;
 
-const DRAG = "application/x-inbox-item";
+export const DRAG = "application/x-inbox-item";
 
 // Category filter: a list on the Inbox page, chips in the Hub panel. Drop an item on one to move it there.
 export function Categories({ inbox, selected, onSelect, chips }: { inbox: Inbox; selected: string | null; onSelect: (id: string | null) => void; chips?: boolean }) {

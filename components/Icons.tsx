@@ -48,3 +48,12 @@ export const RefreshIcon = () => (
 export const MoreIcon = () => (
   <svg {...p}><circle cx="6" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="18" cy="12" r="1" fill="currentColor" /></svg>
 );
+export const BackIcon = () => (
+  <svg {...p}><path d="M15 5l-7 7 7 7" /></svg>
+);
+export const CheckIcon = () => (
+  <svg {...p}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+);
+export const GripIcon = () => (
+  <svg {...p}><circle cx="9" cy="6" r="1" fill="currentColor" /><circle cx="15" cy="6" r="1" fill="currentColor" /><circle cx="9" cy="12" r="1" fill="currentColor" /><circle cx="15" cy="12" r="1" fill="currentColor" /><circle cx="9" cy="18" r="1" fill="currentColor" /><circle cx="15" cy="18" r="1" fill="currentColor" /></svg>
+);

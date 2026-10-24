@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useInbox } from "@/lib/useInbox";
+import { useProjects } from "@/lib/useProjects";
+import { Card, NewProject } from "./Projects";
 import { Categories, InboxList } from "./Inbox";
 import { PanelIcon } from "./Icons";
 import Nav from "./Nav";
@@ -24,6 +26,7 @@ function store(key: string, v: unknown) {
 
 export default function Hub() {
   const inbox = useInbox();
+  const projects = useProjects();
   const [selected, setSelected] = useState<string | null>(null);
   const [panel, setPanel] = useState(true);
   const [view, setView] = useState<View>({ x: 0, y: 0, z: 1 });
@@ -89,8 +92,15 @@ export default function Hub() {
         onPointerCancel={() => { drag.current = null; setDragging(false); }}
       >
         <div className="float"><Nav ai={inbox.ai} vision={inbox.vision} /></div>
-        {/* Project cards go in this layer (F3). */}
-        <div className="layer" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }} />
+        <div className="layer" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
+          {projects.projects.map((p) => <Card key={p.id} project={p} projects={projects} view={view} onLinked={inbox.refresh} />)}
+        </div>
+        {/* New cards go near the middle of what's on screen, nudged so they don't stack exactly. */}
+        <NewProject projects={projects} at={() => {
+          const r = canvas.current!.getBoundingClientRect();
+          const n = projects.projects.length;
+          return { x: (r.width / 2 - view.x) / view.z - 90 + (n % 5) * 24, y: (r.height / 2 - view.y) / view.z - 24 + (n % 5) * 24 };
+        }} />
       </div>
       <button className="toggle" onClick={() => setPanel(!panel)} aria-label={panel ? "Hide inbox" : "Show inbox"}>
         <PanelIcon />
