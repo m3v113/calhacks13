@@ -90,11 +90,11 @@ Hover over any icon to see what it does.
 
 - **Add a note:** type in the box and press **Enter**. **Shift + Enter** adds a new line.
 - **Add a link, image, or document:** press **+** and pick one. You can also drag files onto the inbox or paste an image.
-- **Open an item (a "tray"):** click it. The AI summary is on the left, the item itself (the note, image, PDF, or video) is in the middle, and your own notes are on the right. Everything is editable and saves as you type: click the title, note, summary, or notes to change them. The ↻ button next to Summary writes a fresh one. Links only open when you click the link inside the tray. Press **Esc** or click outside to close.
+- **Open an item (a "tray"):** click it. The AI summary is on the left, the item itself (the note, image, PDF, or video) is in the middle, and your own notes are on the right. Everything is editable and saves as you type: click the title, note, summary, or notes to change them. The ↻ button next to Summary writes a fresh one. Links show the page's preview picture and description, and only open when you click them. Long items can take a minute or two to summarize. If the AI can't write a summary after 3 tries, the tray says so, and ↻ tries again. Press **Esc** or click outside to close.
 - **Move an item to another category:** drag it onto a category on the left. Or click its colored dot or category name (in the list, or at the top of an open tray), then pick a category, or type a new name in **New** and press Enter.
 - **Make a new category:** type a name in **New** under the categories on the left and press Enter. Then drag items onto it.
 - **Rename, recolor, or delete a category:** hover over it on the left and click **⋯**. Type a new name and press Enter, or pick a color. Deleting a category doesn't delete its items: they're sorted again.
-- **The AI learns from your moves:** when you move an item to another category, the AI sees that the next time it sorts something similar. It also sees every category (including ones you made) and a few items already in each, so it knows what each one is for.
+- **The AI learns from your moves:** when you move an item to another category, the AI sees that the next time it sorts something similar. It also sees every category (including ones you made) and a few items already in each, so it knows what each one is for. If an item names one of your categories ("banana bread" → **Banana Bread**), it goes there.
 - **Delete an item:** hover over it and click the trash icon. This deletes it for good, including any uploaded file.
 - **Hub:** drag the background or scroll with two fingers to move around. Pinch (or hold Ctrl and scroll) to zoom. The button at the top right shows or hides the inbox.
 
