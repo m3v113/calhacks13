@@ -40,6 +40,7 @@ model Item {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   sortedBy   String    @default("pending") // "pending" | "rules" | "sure" | "ai" | "user"
+  aiTries    Int       @default(0) // AI runs in a row that didn't produce a summary; retries stop at 3
   projectId  String? // optional link to a project (F3)
   project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   archived   Boolean   @default(false)
@@ -69,6 +70,7 @@ model PageCache {
   summary   String?
   text      String? // readable page text ("" when there was none); used for summaries
   ok        Boolean  @default(true)
+  image     String? // the page's preview picture (og:image or a video thumbnail)
   via       String? // how it was read: "direct", "brightdata", "oembed", or "crossref"
   unlockTries Int    @default(0) // Bright Data requests made for this page (it's paid, so capped)
   fetchedAt DateTime @default(now())

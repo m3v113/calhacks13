@@ -266,10 +266,13 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
       {item.kind === "image" && !item.id.startsWith("tmp-") && (
         <span className="thumb"><img src={`/api/files/${item.id}`} alt="" /></span>
       )}
-      {showCat && category && !pending && (
-        <button className="cat" onClick={() => setOpen(!open)}>{category.name}</button>
-      )}
-      {!pending && <button className="delete" onClick={() => inbox.remove(item.id)} aria-label="Delete" data-tip="Delete"><TrashIcon /></button>}
+      {/* Right column: delete on top, the category under it, lined up from row to row. */}
+      <div className="aside">
+        {!pending && <button className="delete" onClick={() => inbox.remove(item.id)} aria-label="Delete" data-tip="Delete"><TrashIcon /></button>}
+        {showCat && category && !pending && (
+          <button className="cat" onClick={() => setOpen(!open)}>{category.name}</button>
+        )}
+      </div>
       {open && <Menu inbox={inbox} item={item} onClose={() => setOpen(false)} />}
     </li>
   );
