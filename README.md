@@ -145,6 +145,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | The dot stays yellow | Open the Ollama app, and check that `ollama list` shows `gemma3:4b`. If your `.env` is from before the switch, change `OLLAMA_MODEL` in it to `"gemma3:4b"`. |
 | Everything lands in "Other" | Usually Ollama isn't running. Start it and the inbox re-sorts within a minute. |
 | An image only shows its file name | No working image model. Run `ollama pull gemma3:4b`, then wait a couple of minutes. The Terminal shows `[sort] image model … failed` with the reason if one is installed but broken. |
+| A link shows its address instead of a title | Its page couldn't be read (the site blocked it, was slow, or you were offline). The Terminal shows `[link] couldn't read …` with the reason. It's tried again in an hour, and right away when you restart `npm run dev`. |
 | A summary never appears | Check the Terminal for `[sort] AI failed`. Summaries need Ollama running. A link whose page can't be read gets no summary, but you can write one. |
 | `Module not found: Can't resolve '…'` | A new library was added in an update. Run `npm install`. |
 | A page says 404 | The Hub is at http://localhost:3000 and the inbox at http://localhost:3000/inbox. |

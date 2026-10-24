@@ -215,6 +215,19 @@ export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string 
   );
 }
 
+// A readable name from a link's address while its page hasn't been read,
+// e.g. ".../recipe/20144/banana-banana-bread/" → "Banana banana bread".
+export function fromUrl(url: string) {
+  try {
+    const part = new URL(url).pathname.split("/").filter((p) => /[a-z]/i.test(p) && /[-_]/.test(p)).pop();
+    if (!part) return null;
+    const words = decodeURIComponent(part).replace(/\.[a-z]+$/i, "").replace(/[-_]+/g, " ").trim();
+    return words ? words[0].toUpperCase() + words.slice(1) : null;
+  } catch {
+    return null;
+  }
+}
+
 function host(url: string) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -246,7 +259,7 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
       <div className="body">
         {heading && <div className="title">{heading}</div>}
         {showText && <div className={heading ? "text sub" : "text"}>{text}</div>}
-        {item.kind === "link" && !heading && <div className="text">{item.url ?? text}</div>}
+        {item.kind === "link" && !heading && <div className="text">{(item.url && fromUrl(item.url)) ?? item.url ?? text}</div>}
         {item.url && <div className="host">{host(item.url)}</div>}
         {item.kind === "document" && !pending && item.title !== item.fileName && <div className="host">{item.fileName}</div>}
       </div>

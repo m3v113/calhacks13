@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Category, useInbox } from "@/lib/useInbox";
 import { CloseIcon, OpenIcon, RefreshIcon, TrashIcon } from "./Icons";
-import { Menu } from "./Inbox";
+import { Menu, fromUrl } from "./Inbox";
 
 type Inbox = ReturnType<typeof useInbox>;
 type Full = {
@@ -125,7 +125,7 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
             </section>
 
             <section className="tray-main">
-              <Field className="tray-title" label="Title" placeholder="Title" value={item.title ?? ""} onSave={(title) => save({ title })} />
+              <Field className="tray-title" label="Title" placeholder={(item.url && fromUrl(item.url)) || "Title"} value={item.title ?? ""} onSave={(title) => save({ title })} />
 
               {item.kind === "note" && <Field className="tray-text" label="Note" placeholder="Write a note" value={item.text} onSave={(text) => save({ text })} />}
 

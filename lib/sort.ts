@@ -174,6 +174,7 @@ async function clearGuessedLinkTitles() {
   linksChecked = true;
   // Forget failed page reads too, so the new readers (like Crossref) get a chance right away.
   await db.pageCache.deleteMany({ where: { title: null } });
+  await db.item.updateMany({ where: { kind: "link", title: null }, data: { updatedAt: new Date(0) } });
   const links = await db.item.findMany({ where: { kind: "link", NOT: { title: null } }, select: { id: true, url: true, title: true } });
   for (const l of links) {
     const page = l.url ? await db.pageCache.findUnique({ where: { url: l.url } }) : null;

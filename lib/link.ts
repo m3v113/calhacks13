@@ -77,6 +77,12 @@ function readable(html: string) {
   }
 }
 
+const BROWSER = {
+  "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "accept-language": "en-US,en;q=0.9",
+};
+
 // Reads a page's title, description, and text once, then serves it from the cache.
 // Reads that found no title are retried after an hour (e.g. when you were offline).
 export async function readLink(url: string) {
@@ -93,11 +99,14 @@ export async function readLink(url: string) {
     ({ title, summary, text } = embed);
     ok = true;
   } else try {
+    // Some sites (like allrecipes) turn away requests that don't look like a browser, and their pages are
+    // big and slow, so ask like a browser and allow time to download the whole page.
     const r = await fetch(url, {
-      headers: { "user-agent": "Mozilla/5.0 (Macintosh) ProjectScaffold/0.1", accept: "text/html" },
+      headers: BROWSER,
       redirect: "follow",
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(12000),
     });
+    if (!r.ok) console.warn(`[link] couldn't read ${url}: HTTP ${r.status}`);
     if (r.ok && (r.headers.get("content-type") ?? "").includes("html")) {
       const html = (await r.text()).slice(0, 1_500_000);
       title = meta(html, "og:title") ?? (html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ? decode(html.match(/<title[^>]*>([^<]*)<\/title>/i)![1]) : null);
@@ -105,7 +114,9 @@ export async function readLink(url: string) {
       text = readable(html);
       ok = true;
     }
-  } catch {}
+  } catch (e) {
+    console.warn(`[link] couldn't read ${url}:`, (e as Error).message);
+  }
   const data = { title: title?.slice(0, 200) ?? null, summary: summary?.slice(0, 500) ?? null, text: text ?? "", ok, fetchedAt: new Date() };
   return db.pageCache.upsert({ where: { url }, create: { url, ...data }, update: data });
 }
