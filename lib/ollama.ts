@@ -1,6 +1,6 @@
 const URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
 export const MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:3b";
-const VISION = process.env.OLLAMA_VISION_MODEL; // optional: the image model to prefer
+const VISION = process.env.OLLAMA_VISION_MODEL ?? "gemma3:4b"; // the image model to prefer
 
 type Model = { name: string; size: number };
 let last = { at: 0, models: null as Model[] | null };
@@ -39,7 +39,7 @@ async function hasVision(name: string) {
   return canSee.get(name)!;
 }
 
-// The model used to read images: OLLAMA_VISION_MODEL if set and working, otherwise the smallest
+// The model used to read images: OLLAMA_VISION_MODEL (gemma3:4b by default) if working, otherwise the smallest
 // installed model that can see images. Null when there's none.
 export async function visionModel() {
   const list = await models();

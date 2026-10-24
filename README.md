@@ -37,15 +37,15 @@ Ollama runs AI models on your computer.
    ollama pull llama3.2:3b
    ```
 
-4. **For images:** to have screenshots and photos read and sorted by what's in them, you need a model that can see images. If you don't have one, download a small one (about 3 GB):
+4. **For images:** to have screenshots and photos read and sorted by what's in them, download the image model too (about 3 GB):
 
    ```bash
    ollama pull gemma3:4b
    ```
 
-   The app finds any installed model that can see images on its own (it asks Ollama which ones can), and uses the smallest. Without one, images are only sorted by their file name, and they're re-read on their own once a model is installed.
+   The app uses `gemma3:4b` for images. If it isn't installed, it falls back to any other installed model that can see images. Without one, images are only sorted by their file name, and they're re-read on their own once the model is installed.
 
-   > `llama3.2-vision` doesn't work on recent Ollama versions ("unknown model architecture: 'mllama'"). The app skips it, and you can remove it with `ollama rm llama3.2-vision` to free 8 GB.
+   > Don't use `llama3.2-vision`. Ollama dropped support for it in version 0.30 ("unknown model architecture: 'mllama'"), and updating doesn't bring it back. If you have it, `ollama rm llama3.2-vision` frees 8 GB.
 
 ### 3. Get the code
 
@@ -122,7 +122,7 @@ npm run dev       # also updates the database to match
 | `DATABASE_URL` | `file:../data/app.db` | Where your data is stored |
 | `OLLAMA_URL` | `http://localhost:11434` | Where Ollama is running |
 | `OLLAMA_MODEL` | `llama3.2:3b` | Model used to sort and title items |
-| `OLLAMA_VISION_MODEL` | (none) | Optional. The model to read images with. Without it, the smallest installed model that can see images is used. |
+| `OLLAMA_VISION_MODEL` | `gemma3:4b` | Model used to read images. If it isn't installed, the smallest other model that can see images is used. |
 
 Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 
