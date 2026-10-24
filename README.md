@@ -106,6 +106,19 @@ npm install       # only needed if new libraries were added; safe to run anyway
 npm run dev       # also updates the database to match
 ```
 
+### Trying a pull request before merging it
+
+Each pull request has its own branch (shown on the PR page, e.g. `tags-and-side-trays`). To run it without merging:
+
+```bash
+git fetch origin BRANCH-NAME
+git checkout BRANCH-NAME
+npm install
+npm run dev
+```
+
+When you're done, stop the server (Ctrl+C) and go back with `git checkout main`. If it works, approve and merge the PR on GitHub, then `git pull` on `main`.
+
 ---
 
 ## Settings (`.env`)
