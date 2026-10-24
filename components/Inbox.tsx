@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Category, Item, useInbox } from "@/lib/useInbox";
-import { DocIcon, ImageIcon, LinkIcon, NoteIcon, PlusIcon } from "./Icons";
+import { DocIcon, ImageIcon, LinkIcon, NoteIcon, PlusIcon, TrashIcon } from "./Icons";
+import ItemView from "./ItemView";
 
 type Inbox = ReturnType<typeof useInbox>;
 
@@ -44,6 +45,7 @@ export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string 
   const [mode, setMode] = useState<"note" | "link">("note");
   const [adding, setAdding] = useState(false);
   const [dropping, setDropping] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const addMenu = useRef<HTMLDivElement>(null);
@@ -129,9 +131,10 @@ export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string 
       </div>
       <ul className="items">
         {items.map((i) => (
-          <Row key={i.id} item={i} category={i.categoryId ? byId.get(i.categoryId) : undefined} inbox={inbox} showCat={!selected} />
+          <Row key={i.id} item={i} category={i.categoryId ? byId.get(i.categoryId) : undefined} inbox={inbox} showCat={!selected} onOpen={() => setViewing(i.id)} />
         ))}
       </ul>
+      {viewing && <ItemView id={viewing} inbox={inbox} onClose={() => setViewing(null)} />}
     </div>
   );
 }
@@ -144,7 +147,7 @@ function host(url: string) {
   }
 }
 
-function Row({ item, category, inbox, showCat }: { item: Item; category?: Category; inbox: Inbox; showCat: boolean }) {
+function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?: Category; inbox: Inbox; showCat: boolean; onOpen: () => void }) {
   const [open, setOpen] = useState(false);
   const pending = item.sortedBy === "pending" || item.id.startsWith("tmp-");
   const file = item.kind === "image" || item.kind === "document";
@@ -154,7 +157,11 @@ function Row({ item, category, inbox, showCat }: { item: Item; category?: Catego
   const showText = item.kind === "note" && item.sortedBy !== "sure" && (!heading || heading !== text);
 
   return (
-    <li className="item">
+    <li className={`item ${pending ? "" : "openable"}`} onClick={(e) => {
+      // Clicking the row opens it; clicks on its buttons, links, and menu don't.
+      if (pending || (e.target as HTMLElement).closest("button, a, input, .menu")) return;
+      onOpen();
+    }}>
       <button className="pick" onClick={() => !pending && setOpen(!open)} aria-label="Change category">
         <span className={`dot ${pending ? "pending" : ""}`} style={pending ? undefined : { background: category?.color ?? "var(--line)" }} />
       </button>
@@ -168,14 +175,12 @@ function Row({ item, category, inbox, showCat }: { item: Item; category?: Catego
         )}
       </div>
       {item.kind === "image" && !item.id.startsWith("tmp-") && (
-        <a href={`/api/files/${item.id}`} target="_blank" rel="noreferrer" className="thumb">
-          <img src={`/api/files/${item.id}`} alt="" />
-        </a>
+        <span className="thumb"><img src={`/api/files/${item.id}`} alt="" /></span>
       )}
       {showCat && category && !pending && (
         <button className="cat" onClick={() => setOpen(!open)}>{category.name}</button>
       )}
-      {!pending && <button className="done" onClick={() => inbox.archive(item.id)} aria-label="Archive" title="Archive" />}
+      {!pending && <button className="delete" onClick={() => inbox.remove(item.id)} aria-label="Delete" data-tip="Delete"><TrashIcon /></button>}
       {open && <Menu inbox={inbox} item={item} onClose={() => setOpen(false)} />}
     </li>
   );

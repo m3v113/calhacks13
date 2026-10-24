@@ -11,7 +11,7 @@ export default function InboxPage() {
   return (
     <div className="page">
       <aside className="side">
-        <Nav ai={inbox.ai} />
+        <Nav ai={inbox.ai} vision={inbox.vision} />
         <Categories inbox={inbox} selected={selected} onSelect={setSelected} />
       </aside>
       <main className="main">

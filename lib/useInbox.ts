@@ -21,6 +21,7 @@ export function useInbox() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [ai, setAi] = useState<boolean | null>(null);
+  const [vision, setVision] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const load = useCallback(async () => {
@@ -40,7 +41,9 @@ export function useInbox() {
 
   const loadStatus = useCallback(async () => {
     try {
-      setAi((await (await fetch("/api/status", { cache: "no-store" })).json()).ai);
+      const s = await (await fetch("/api/status", { cache: "no-store" })).json();
+      setAi(s.ai);
+      setVision(s.vision);
     } catch {
       setAi(null);
     }
@@ -93,5 +96,11 @@ export function useInbox() {
     return patch(id, { archived: true });
   }, [patch]);
 
-  return { categories, items, ai, add, upload, setCategory, newCategory, archive };
+  const remove = useCallback(async (id: string) => {
+    setItems((xs) => xs.filter((i) => i.id !== id));
+    await fetch(`/api/items/${id}`, { method: "DELETE" });
+    load();
+  }, [load]);
+
+  return { categories, items, ai, vision, add, upload, setCategory, newCategory, archive, remove };
 }

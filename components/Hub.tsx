@@ -88,7 +88,7 @@ export default function Hub() {
         onPointerUp={() => { drag.current = null; setDragging(false); }}
         onPointerCancel={() => { drag.current = null; setDragging(false); }}
       >
-        <div className="float"><Nav ai={inbox.ai} /></div>
+        <div className="float"><Nav ai={inbox.ai} vision={inbox.vision} /></div>
         {/* Project cards go in this layer (F3). */}
         <div className="layer" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }} />
       </div>

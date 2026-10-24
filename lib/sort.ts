@@ -45,7 +45,9 @@ export async function sortItem(id: string) {
   if (!item) return;
   const userSorted = item.sortedBy === "user";
 
-  let { title, summary } = item;
+  let { summary } = item;
+  // Notes and links keep a title once they have one; files are re-titled each time (e.g. once a vision model can see the image).
+  let title = item.kind === "image" || item.kind === "document" ? null : item.title;
   let pageTitle = false;
   const url = item.url ?? (item.kind === "note" || item.kind === "link" ? firstUrl(item.text) : null);
   if (url && !title) {
@@ -74,11 +76,13 @@ export async function sortItem(id: string) {
       const existing = (await db.category.findMany({ orderBy: { createdAt: "asc" } })).map((c) => c.name);
       const user = `Existing categories: ${existing.join(", ")}\n\nItem:\n${content.slice(0, 4000)}`;
       const vision = item.kind === "image" && item.filePath ? await visionModel() : null;
+      // Without a vision model an image can only be sorted by its file name; try again once one is installed.
+      const blind = item.kind === "image" && !vision;
       const opts = vision ? { model: vision, images: [await asBase64(item.filePath!)] } : {};
       const a = await chatJSON(SYSTEM, vision ? `${user}\n(The image is attached; look at it.)` : user, SCHEMA, isAnswer, opts);
       name = a.category;
-      aiTitle = cleanTitle(a.title) || null;
-      sortedBy = "ai";
+      aiTitle = blind ? null : cleanTitle(a.title) || null;
+      sortedBy = blind ? "rules" : "ai";
     } catch (e) {
       console.warn("[sort] AI failed, using rules:", (e as Error).message);
     }
@@ -110,12 +114,14 @@ export async function sweep() {
   lastSweep = Date.now();
   try {
     const up = await ollamaUp();
+    // Images sorted by name only wait for a vision model.
+    const canSee = up && (await visionModel()) !== null;
     const stuck = await db.item.findMany({
       where: {
         archived: false,
         OR: [
           { sortedBy: "pending", createdAt: { lt: new Date(Date.now() - 60_000) } },
-          ...(up ? [{ sortedBy: "rules" }, { title: null }] : []),
+          ...(up ? [canSee ? { sortedBy: "rules" } : { sortedBy: "rules", kind: { not: "image" } }, { title: null }] : []),
         ],
       },
       take: 5,

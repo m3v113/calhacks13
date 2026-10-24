@@ -37,11 +37,13 @@ Ollama runs AI models on your computer.
    ollama pull llama3.2:3b
    ```
 
-4. **Optional:** to have images read and sorted by what's in them (not just their file name), also download the vision model (about 8 GB):
+4. **For images:** to have screenshots and photos read and sorted by what's in them, also download the vision model (about 8 GB):
 
    ```bash
    ollama pull llama3.2-vision
    ```
+
+   Without it, images are only sorted by their file name (so a screenshot just shows its file name). Images added before you install it are re-sorted on their own about a minute after the app sees the model.
 
 ### 3. Get the code
 
@@ -79,18 +81,22 @@ To stop the app, click in Terminal and press **Ctrl + C**. To start it again lat
 
 ## Using it
 
+Hover over any icon to see what it does.
+
 | You see | It means |
 |---|---|
-| Four dots icon | The Hub (home) |
+| Four dots icon | The Hub (home page) |
 | Tray icon | The Smart Inbox page |
-| **Green dot** next to the icons | Local AI is running |
+| Half-filled circle, sun, or moon | Theme. Click to switch: **match Mac** (follows your Mac's Light/Dark setting) → **light** → **dark**. Your choice is remembered. |
+| **Green dot** | Local AI is running. Hover to see whether an image model is installed. |
 | **Yellow dot** | Ollama isn't running. Items are sorted by simple rules for now and re-sorted by AI once Ollama is back. |
 | Pulsing gray dot on an item | The AI is still sorting it |
 
 - **Add a note:** type in the box and press **Enter**. **Shift + Enter** adds a new line.
 - **Add a link, image, or document:** press **+** and pick one. You can also drag files onto the inbox or paste an image.
+- **Open an item:** click it to see it in full: the whole note, the image, the PDF, or the video. Press **Esc** or click outside to close.
 - **Move an item to another category:** click its colored dot or category name, then pick a category, or type a new name in **New** and press Enter.
-- **Archive an item:** hover over it and click the circle on the right.
+- **Delete an item:** hover over it and click the trash icon. This deletes it for good, including any uploaded file.
 - **Hub:** drag the background or scroll with two fingers to move around. Pinch (or hold Ctrl and scroll) to zoom. The button at the top right shows or hides the inbox.
 
 ---
@@ -128,6 +134,9 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | `command not found: ollama` | Open the Ollama app once; it adds the command. Then reopen Terminal. |
 | The dot stays yellow | Open the Ollama app, and check that `ollama list` shows `llama3.2:3b`. |
 | Everything lands in "Other" | Usually Ollama isn't running. Start it and the inbox re-sorts within a minute. |
+| An image only shows its file name | No image model is installed. Run `ollama pull llama3.2-vision`, then wait a minute. |
+| `Module not found: Can't resolve '…'` | A new library was added in an update. Run `npm install`. |
+| A page says 404 | The Hub is at http://localhost:3000 and the inbox at http://localhost:3000/inbox. |
 | `Environment variable not found: DATABASE_URL` | You skipped `cp .env.example .env`. Run it, then try again. |
 | `Port 3000 is in use` | The app is already running in another Terminal window. Use that one, or stop it with Ctrl + C. |
 | Something looks broken after `git pull` | Run `npm install`, then `npm run dev` again. |
@@ -167,6 +176,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | `lib/ollama.ts` | Talks to Ollama |
 | `lib/link.ts` | Reads a link's title and description (cached) |
 | `lib/files.ts` | Saves uploads and pulls text out of documents |
-| `app/api/` | Server routes: `items` (list, add, change, archive), `files` (serve uploads), `status` |
+| `components/ItemView.tsx` | The full view that opens when you click an item |
+| `app/api/` | Server routes: `items` (list, add, change, delete), `files` (serve uploads), `status` |
 | `prisma/schema.prisma` | The data model |
 | `data/` | Your database and uploads (not in git) |
