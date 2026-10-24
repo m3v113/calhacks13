@@ -131,6 +131,10 @@ When you're done, stop the server (Ctrl+C) and go back with `git checkout main`.
 | `OLLAMA_URL` | `http://localhost:11434` | Where Ollama is running |
 | `OLLAMA_MODEL` | `gemma3:4b` | Model used to sort, title, and summarize items |
 | `OLLAMA_VISION_MODEL` | same as `OLLAMA_MODEL` | Model used to read images. If it isn't installed, the smallest other model that can see images is used. |
+| `BRIGHTDATA_API_KEY` | (none) | Optional. A [Bright Data](https://brightdata.com) API key, used as a backup to read sites that block the app (HTTP 403), like allrecipes. Only the addresses of those pages are sent to Bright Data. |
+| `BRIGHTDATA_ZONE` | `web_unlocker1` | The name of your Web Unlocker zone in Bright Data |
+
+**Setting up Bright Data (optional):** in the Bright Data dashboard, add a **Web Unlocker** zone (the default name is `web_unlocker1`), then copy your API key from **Account settings → API keys**. Put both in `.env` and restart the app. Links that failed before are read again on restart.
 
 Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 
@@ -145,7 +149,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | The dot stays yellow | Open the Ollama app, and check that `ollama list` shows `gemma3:4b`. If your `.env` is from before the switch, change `OLLAMA_MODEL` in it to `"gemma3:4b"`. |
 | Everything lands in "Other" | Usually Ollama isn't running. Start it and the inbox re-sorts within a minute. |
 | An image only shows its file name | No working image model. Run `ollama pull gemma3:4b`, then wait a couple of minutes. The Terminal shows `[sort] image model … failed` with the reason if one is installed but broken. |
-| A link shows its address instead of a title | Its page couldn't be read (the site blocked it, was slow, or you were offline). The Terminal shows `[link] couldn't read …` with the reason. It's tried again in an hour, and right away when you restart `npm run dev`. |
+| A link shows its address instead of a title | Its page couldn't be read (the site blocked it, was slow, or you were offline). The Terminal shows `[link] couldn't read …` with the reason. For `HTTP 403`, the site blocks apps: set up the optional Bright Data key (see Settings). It's tried again in an hour, and right away when you restart `npm run dev`. |
 | A summary never appears | Check the Terminal for `[sort] AI failed`. Summaries need Ollama running. A link whose page can't be read gets no summary, but you can write one. |
 | `Module not found: Can't resolve '…'` | A new library was added in an update. Run `npm install`. |
 | A page says 404 | The Hub is at http://localhost:3000 and the inbox at http://localhost:3000/inbox. |
@@ -165,6 +169,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | Local AI | [Ollama](https://ollama.com) | Runs models on your Mac. The app asks for JSON in a fixed shape, checks it, and retries once. |
 | Reading documents | [unpdf](https://github.com/unjs/unpdf) | Pulls text out of PDFs so the AI can sort and summarize them |
 | Reading web pages | [Readability](https://github.com/mozilla/readability) + [linkedom](https://github.com/WebReflection/linkedom) | Pulls the article text out of a page, without menus and ads, on your Mac. This is what Firefox's Reader View uses. |
+| Blocked sites (optional) | [Bright Data Web Unlocker](https://brightdata.com/products/web-unlocker) | Only when a site refuses the app (HTTP 403) and a key is set. Fetches the page the way a browser would. |
 | Research papers | [Crossref](https://www.crossref.org) | A free database of journal papers. Gives the real title, journal, year, and often the abstract when a publisher's site blocks reading. |
 | Styling | Plain CSS (`app/globals.css`) | A few colors and shapes; light and dark mode follow your system |
 
