@@ -114,6 +114,8 @@ let linksChecked = false;
 // Older versions let the AI guess titles for links it couldn't read. Clear those once, so they get a real one.
 async function clearGuessedLinkTitles() {
   linksChecked = true;
+  // Forget failed page reads too, so the new readers (like Crossref) get a chance right away.
+  await db.pageCache.deleteMany({ where: { title: null } });
   const links = await db.item.findMany({ where: { kind: "link", NOT: { title: null } }, select: { id: true, url: true, title: true } });
   for (const l of links) {
     const page = l.url ? await db.pageCache.findUnique({ where: { url: l.url } }) : null;
