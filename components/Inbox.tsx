@@ -6,10 +6,20 @@ import ItemView from "./ItemView";
 
 type Inbox = ReturnType<typeof useInbox>;
 
-// Category filter: a list on the Inbox page, chips in the Hub panel.
+const DRAG = "application/x-inbox-item";
+
+// Category filter: a list on the Inbox page, chips in the Hub panel. Drop an item on one to move it there.
 export function Categories({ inbox, selected, onSelect, chips }: { inbox: Inbox; selected: string | null; onSelect: (id: string | null) => void; chips?: boolean }) {
-  const shown = inbox.categories.filter((c) => c.count > 0 || c.id === selected);
+  const [over, setOver] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  // The list shows every category, so a new one has a place to drop things into. The chips only show the ones in use.
+  const shown = chips ? inbox.categories.filter((c) => c.count > 0 || c.id === selected) : inbox.categories;
   const total = inbox.items.length;
+  const drop = (id: string) => ({
+    onDragOver: (e: React.DragEvent) => { if (e.dataTransfer.types.includes(DRAG)) { e.preventDefault(); setOver(id); } },
+    onDragLeave: () => setOver((o) => (o === id ? null : o)),
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); setOver(null); const item = e.dataTransfer.getData(DRAG); if (item) inbox.setCategory(item, id); },
+  });
   return (
     <ul className={chips ? "chips" : "cats"}>
       <li>
@@ -21,13 +31,28 @@ export function Categories({ inbox, selected, onSelect, chips }: { inbox: Inbox;
       </li>
       {shown.map((c) => (
         <li key={c.id}>
-          <button className={selected === c.id ? "on" : ""} onClick={() => onSelect(c.id)}>
+          <button className={`${selected === c.id ? "on" : ""} ${over === c.id ? "over" : ""}`} onClick={() => onSelect(c.id)} {...drop(c.id)}>
             <span className="dot" style={{ background: c.color }} />
             <span className="name">{c.name}</span>
-            {!chips && <span className="count">{c.count}</span>}
+            {!chips && <span className="count">{c.count || ""}</span>}
           </button>
         </li>
       ))}
+      {!chips && (
+        <li className="new-cat">
+          <PlusIcon />
+          <input
+            value={name}
+            placeholder="New"
+            aria-label="New category"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && name.trim()) { inbox.createCategory(name.trim()); setName(""); }
+              if (e.key === "Escape") { setName(""); e.currentTarget.blur(); }
+            }}
+          />
+        </li>
+      )}
     </ul>
   );
 }
@@ -157,7 +182,9 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
   const showText = item.kind === "note" && item.sortedBy !== "sure" && (!heading || heading !== text);
 
   return (
-    <li className={`item ${pending ? "" : "openable"}`} onClick={(e) => {
+    <li className={`item ${pending ? "" : "openable"}`} draggable={!pending}
+      onDragStart={(e) => { e.dataTransfer.setData(DRAG, item.id); e.dataTransfer.effectAllowed = "move"; }}
+      onClick={(e) => {
       // Clicking the row opens it; clicks on its buttons, links, and menu don't.
       if (pending || (e.target as HTMLElement).closest("button, a, input, .menu")) return;
       onOpen();

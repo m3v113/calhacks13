@@ -88,8 +88,9 @@ Hover over any icon to see what it does.
 
 - **Add a note:** type in the box and press **Enter**. **Shift + Enter** adds a new line.
 - **Add a link, image, or document:** press **+** and pick one. You can also drag files onto the inbox or paste an image.
-- **Open an item (a "tray"):** click it. On the left are the content (the note, image, PDF, or video) and an AI summary. On the right is space for your own notes. Everything is editable and saves as you type: click the title, note, summary, or notes to change them. The ↻ button next to Summary writes a fresh one. Links only open when you click the link inside the tray. Press **Esc** or click outside to close.
-- **Move an item to another category:** click its colored dot or category name, then pick a category, or type a new name in **New** and press Enter.
+- **Open an item (a "tray"):** click it. The AI summary is on the left, the item itself (the note, image, PDF, or video) is in the middle, and your own notes are on the right. Everything is editable and saves as you type: click the title, note, summary, or notes to change them. The ↻ button next to Summary writes a fresh one. Links only open when you click the link inside the tray. Press **Esc** or click outside to close.
+- **Move an item to another category:** drag it onto a category on the left. Or click its colored dot or category name, then pick a category, or type a new name in **New** and press Enter.
+- **Make a new category:** type a name in **New** under the categories on the left and press Enter. Then drag items onto it.
 - **Delete an item:** hover over it and click the trash icon. This deletes it for good, including any uploaded file.
 - **Hub:** drag the background or scroll with two fingers to move around. Pinch (or hold Ctrl and scroll) to zoom. The button at the top right shows or hides the inbox.
 
@@ -104,6 +105,19 @@ git pull
 npm install       # only needed if new libraries were added; safe to run anyway
 npm run dev       # also updates the database to match
 ```
+
+### Trying a pull request before merging it
+
+Each pull request has its own branch (shown on the PR page, e.g. `tags-and-side-trays`). To run it without merging:
+
+```bash
+git fetch origin BRANCH-NAME
+git checkout BRANCH-NAME
+npm install
+npm run dev
+```
+
+When you're done, stop the server (Ctrl+C) and go back with `git checkout main`. If it works, approve and merge the PR on GitHub, then `git pull` on `main`.
 
 ---
 
@@ -166,14 +180,15 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | `app/page.tsx` | Hub page (`/`) |
 | `app/inbox/page.tsx` | Smart Inbox page (`/inbox`) |
 | `components/Hub.tsx` | Canvas (pan and zoom) and the inbox side panel |
-| `components/Inbox.tsx` | Category list, add box and + menu, item rows, category menu |
+| `components/Inbox.tsx` | Category list (with New and drag and drop), add box and + menu, item rows, category menu |
 | `components/Nav.tsx` | Page icons and the status dot |
 | `lib/useInbox.ts` | Inbox data shared by both pages |
 | `lib/sort.ts` | Sorting and titles: Wordle rule, AI, fallback rules, background re-sort |
 | `lib/ollama.ts` | Talks to Ollama |
 | `lib/link.ts` | Reads a link's title and description (cached) |
 | `lib/files.ts` | Saves uploads and pulls text out of documents |
-| `components/ItemView.tsx` | The tray view: content, summary, and notes, all editable |
+| `components/ItemView.tsx` | The tray view: summary, content, and notes, all editable |
+| `app/api/categories/route.ts` | Makes a new category |
 | `app/api/` | Server routes: `items` (list, add, change, delete), `files` (serve uploads), `status` |
 | `prisma/schema.prisma` | The data model |
 | `data/` | Your database and uploads (not in git) |

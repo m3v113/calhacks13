@@ -50,7 +50,7 @@ function Field({ value, onSave, className, placeholder, label }: {
   );
 }
 
-// The tray view: content and summary on the left, your notes on the right. Everything saves as you type.
+// The tray view: the summary on the left, the item in the middle, your notes on the right. Everything saves as you type.
 export default function ItemView({ id, inbox, onClose }: { id: string; inbox: Inbox; onClose: () => void }) {
   const [item, setItem] = useState<Full | null>(null);
 
@@ -104,10 +104,23 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
         </div>
         {item && (
           <div className="tray-cols">
+            <section className="side-tray tray-summary-side">
+              <div className="label">
+                Summary
+                <button className="icon small" data-tip="Write a new summary" aria-label="Write a new summary"
+                  onClick={() => { setItem({ ...item, overview: null, overviewBy: null }); save({ summarize: true }); }}>
+                  <RefreshIcon />
+                </button>
+              </div>
+              {!waiting
+                ? <Field className="tray-summary" label="Summary" placeholder="Write a summary" value={item.overview ?? ""} onSave={(overview) => save({ overview })} />
+                : <div className="tray-summary pending-lines" aria-label="Writing a summary"><span /><span /><span /></div>}
+            </section>
+
             <section className="tray-main">
               <Field className="tray-title" label="Title" placeholder="Title" value={item.title ?? ""} onSave={(title) => save({ title })} />
 
-              {item.kind === "note" && <Field className="tray-text" label="Note" value={item.text} onSave={(text) => save({ text })} />}
+              {item.kind === "note" && <Field className="tray-text" label="Note" placeholder="Write a note" value={item.text} onSave={(text) => save({ text })} />}
 
               {item.kind === "link" && item.url && (
                 <>
@@ -130,20 +143,9 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
                   <a className="source" href={file} target="_blank" rel="noreferrer"><OpenIcon />{item.fileName}</a>
                 </>
               )}
-
-              <div className="label">
-                Summary
-                <button className="icon small" data-tip="Write a new summary" aria-label="Write a new summary"
-                  onClick={() => { setItem({ ...item, overview: null, overviewBy: null }); save({ summarize: true }); }}>
-                  <RefreshIcon />
-                </button>
-              </div>
-              {!waiting
-                ? <Field className="tray-summary" label="Summary" placeholder="Write a summary" value={item.overview ?? ""} onSave={(overview) => save({ overview })} />
-                : <div className="tray-summary pending-lines" aria-label="Writing a summary"><span /><span /><span /></div>}
             </section>
 
-            <section className="tray-notes">
+            <section className="side-tray tray-notes">
               <div className="label">Notes</div>
               <Field className="notes" label="Notes" placeholder="Add your notes" value={item.notes ?? ""} onSave={(notes) => save({ notes })} />
             </section>
