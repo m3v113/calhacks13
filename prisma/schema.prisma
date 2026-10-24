@@ -1,0 +1,63 @@
+// Live data model for the app (local SQLite).
+// Grows feature by feature; the full target model is in plans/schema.prisma.
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// F1: a Smart Inbox category, made by the AI or by you
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String
+  auto      Boolean  @default(true) // false when you made it
+  createdAt DateTime @default(now())
+
+  items Item[]
+}
+
+// F1: anything captured in the Smart Inbox
+model Item {
+  id         String    @id @default(cuid())
+  text       String // what you typed or pasted
+  url        String? // first link found in the text
+  title      String? // page title, when the link could be read
+  summary    String? // page description, when the link could be read
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  sortedBy   String    @default("pending") // "pending" | "rules" | "sure" | "ai" | "user"
+  projectId  String? // optional link to a project (F3)
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  archived   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([archived, createdAt])
+}
+
+// F2/F3: a project card on the Hub (UI comes later)
+model Project {
+  id        String   @id @default(cuid())
+  title     String
+  color     String?
+  canvasX   Float    @default(0)
+  canvasY   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items Item[]
+}
+
+// Links read online, kept so nothing is fetched twice
+model PageCache {
+  url       String   @id
+  title     String?
+  summary   String?
+  ok        Boolean  @default(true)
+  fetchedAt DateTime @default(now())
+}
