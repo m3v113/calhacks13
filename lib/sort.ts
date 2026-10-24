@@ -46,8 +46,9 @@ export async function sortItem(id: string) {
   const userSorted = item.sortedBy === "user";
 
   let { summary } = item;
-  // Notes and links keep a title once they have one; files are re-titled each time (e.g. once a vision model can see the image).
-  let title = item.kind === "image" || item.kind === "document" ? null : item.title;
+  // Notes keep a title once they have one. Links only ever use their page's own title (cached),
+  // and files are re-titled each time (e.g. once a vision model can see the image).
+  let title = item.kind === "note" ? item.title : null;
   let pageTitle = false;
   const url = item.url ?? (item.kind === "note" || item.kind === "link" ? firstUrl(item.text) : null);
   if (url && !title) {
@@ -88,8 +89,10 @@ export async function sortItem(id: string) {
     }
   }
 
-  // A real page title wins over one the AI wrote.
-  const finalTitle = pageTitle ? title : title ?? aiTitle ?? (item.kind === "image" || item.kind === "document" ? item.fileName : null);
+  // A real page title wins over one the AI wrote. A link whose page couldn't be read gets no AI title:
+  // the AI would only be guessing from the URL. It's retried later, and the URL shows meanwhile.
+  const unreadLink = item.kind === "link" && !pageTitle;
+  const finalTitle = pageTitle ? title : title ?? (unreadLink ? null : aiTitle) ?? (item.kind === "image" || item.kind === "document" ? item.fileName : null);
 
   if (userSorted) {
     // You picked the category; only fill in the title.
@@ -106,6 +109,17 @@ export async function sortItem(id: string) {
 
 let sweeping = false;
 let lastSweep = 0;
+let linksChecked = false;
+
+// Older versions let the AI guess titles for links it couldn't read. Clear those once, so they get a real one.
+async function clearGuessedLinkTitles() {
+  linksChecked = true;
+  const links = await db.item.findMany({ where: { kind: "link", NOT: { title: null } }, select: { id: true, url: true, title: true } });
+  for (const l of links) {
+    const page = l.url ? await db.pageCache.findUnique({ where: { url: l.url } }) : null;
+    if (page?.title !== l.title) await db.item.update({ where: { id: l.id }, data: { title: null, updatedAt: new Date(0) } });
+  }
+}
 
 // Once Ollama is back, re-sorts items that were sorted by rules (or got stuck) and titles untitled ones.
 export async function sweep() {
@@ -113,6 +127,7 @@ export async function sweep() {
   sweeping = true;
   lastSweep = Date.now();
   try {
+    if (!linksChecked) await clearGuessedLinkTitles();
     const up = await ollamaUp();
     // Images sorted by name only wait for a vision model.
     const canSee = up && (await visionModel()) !== null;
@@ -121,7 +136,9 @@ export async function sweep() {
         archived: false,
         OR: [
           { sortedBy: "pending", createdAt: { lt: new Date(Date.now() - 60_000) } },
-          ...(up ? [canSee ? { sortedBy: "rules" } : { sortedBy: "rules", kind: { not: "image" } }, { title: null }] : []),
+          ...(up ? [canSee ? { sortedBy: "rules" } : { sortedBy: "rules", kind: { not: "image" } }, { title: null, kind: { not: "link" } }] : []),
+          // A link whose page couldn't be read is tried again after an hour.
+          { title: null, kind: "link", updatedAt: { lt: new Date(Date.now() - 3600_000) } },
         ],
       },
       take: 5,
