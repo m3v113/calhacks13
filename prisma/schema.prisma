@@ -28,11 +28,15 @@ model Item {
   text       String // what you typed or pasted; the file name for uploads
   url        String? // first link found in the text
   title      String? // short title: the page title, or one the AI wrote
+  titleBy    String? // "user" once you rename it; then it's never replaced
   summary    String? // page description, when the link could be read
   fileName   String? // uploads: original file name
   filePath   String? // uploads: path under data/uploads/
   mime       String? // uploads: file type
   extracted  String? // documents: text pulled out of the file
+  overview   String? // the tray's summary: written by the AI, editable by you
+  overviewBy String? // "ai" | "user"; the AI never rewrites a summary you edited
+  notes      String? // your own notes on this item
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   sortedBy   String    @default("pending") // "pending" | "rules" | "sure" | "ai" | "user"
@@ -63,6 +67,7 @@ model PageCache {
   url       String   @id
   title     String?
   summary   String?
+  text      String? // readable page text ("" when there was none); used for summaries
   ok        Boolean  @default(true)
   fetchedAt DateTime @default(now())
 }

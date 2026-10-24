@@ -1,13 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { unlink } from "node:fs/promises";
 import { db, categoryByName } from "@/lib/db";
 import { fullPath } from "@/lib/files";
+import { sortItem } from "@/lib/sort";
 
-// Change an item's category (existing id or a new name), or archive it.
+const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
+
+// Edit an item: its category (existing id or a new name), title, note text, summary, or your notes.
+// { summarize: true } asks the AI for a fresh summary.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const data: { categoryId?: string; sortedBy?: string; archived?: boolean } = {};
+  const data: Record<string, unknown> = {};
+  let resort = false;
 
   if (typeof body.categoryId === "string") {
     data.categoryId = body.categoryId;
@@ -20,8 +25,31 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   if (typeof body.archived === "boolean") data.archived = body.archived;
 
+  const title = text(body.title, 200);
+  if (title !== undefined) Object.assign(data, title.trim() ? { title: title.trim(), titleBy: "user" } : { title: null, titleBy: null });
+  const notes = text(body.notes, 50_000);
+  if (notes !== undefined) data.notes = notes;
+  const overview = text(body.overview, 5_000);
+  if (overview !== undefined) Object.assign(data, overview.trim() ? { overview, overviewBy: "user" } : { overview: null, overviewBy: null });
+  if (body.summarize === true) {
+    Object.assign(data, { overview: null, overviewBy: null });
+    resort = true;
+  }
+  const note = text(body.text, 10_000);
+  if (note !== undefined && note.trim()) {
+    data.text = note;
+    // A changed note gets a fresh summary, unless you wrote the summary yourself.
+    const current = await db.item.findUnique({ where: { id }, select: { overviewBy: true, text: true } });
+    if (current && current.text !== note && current.overviewBy !== "user") {
+      Object.assign(data, { overview: null, overviewBy: null });
+      resort = true;
+    }
+  }
+
   try {
-    return NextResponse.json(await db.item.update({ where: { id }, data }));
+    const item = await db.item.update({ where: { id }, data });
+    if (resort) after(() => sortItem(id));
+    return NextResponse.json(item);
   } catch {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
