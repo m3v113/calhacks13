@@ -21,6 +21,7 @@ function meta(html: string, key: string) {
 const OEMBED: [RegExp, string][] = [
   [/(^|\.)(youtube\.com|youtu\.be)$/, "https://www.youtube.com/oembed?format=json&url="],
   [/(^|\.)vimeo\.com$/, "https://vimeo.com/api/oembed.json?url="],
+  [/(^|\.)tiktok\.com$/, "https://www.tiktok.com/oembed?url="], // the title is the video's caption
 ];
 
 async function oembed(url: string) {

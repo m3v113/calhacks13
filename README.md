@@ -183,7 +183,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 **What happens when you add something:**
 
 1. It's saved and shows up right away with a pulsing dot.
-2. For a link, the app reads the page's title and article text. YouTube and Vimeo titles come from their oEmbed service, and research papers from Crossref.
+2. For a link, the app reads the page's title and article text. YouTube, Vimeo, and TikTok titles come from their oEmbed service, and research papers from Crossref.
 3. For a document, its text is pulled out. For an image, a model that can see images describes it.
 4. Wordle scores go straight to **Wordle**. Everything else goes to the local AI, which picks a category (or makes a new one) and writes a short title and a summary. To pick, it sees each category with a few items already in it, plus the last 30 items you moved yourself.
 5. If Ollama is off, simple keyword rules pick a category, and the AI redoes it later.
