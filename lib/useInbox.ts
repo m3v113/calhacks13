@@ -91,6 +91,11 @@ export function useInbox() {
 
   const newCategory = useCallback((id: string, categoryName: string) => patch(id, { categoryName }), [patch]);
 
+  const createCategory = useCallback(async (name: string) => {
+    await fetch("/api/categories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) });
+    load();
+  }, [load]);
+
   const archive = useCallback((id: string) => {
     setItems((xs) => xs.filter((i) => i.id !== id));
     return patch(id, { archived: true });
@@ -102,5 +107,5 @@ export function useInbox() {
     load();
   }, [load]);
 
-  return { categories, items, ai, vision, add, upload, setCategory, newCategory, archive, remove, refresh: load };
+  return { categories, items, ai, vision, add, upload, setCategory, newCategory, createCategory, archive, remove, refresh: load };
 }
