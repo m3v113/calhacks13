@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Category, Item, useInbox } from "@/lib/useInbox";
+import { DocIcon, ImageIcon, LinkIcon, NoteIcon, PlusIcon } from "./Icons";
 
 type Inbox = ReturnType<typeof useInbox>;
 
@@ -30,10 +31,22 @@ export function Categories({ inbox, selected, onSelect, chips }: { inbox: Inbox;
   );
 }
 
-// The capture box and the item list.
+const ADD: { kind: "note" | "link" | "image" | "document"; label: string; Icon: () => React.JSX.Element; accept?: string }[] = [
+  { kind: "note", label: "Note", Icon: NoteIcon },
+  { kind: "link", label: "Link", Icon: LinkIcon },
+  { kind: "image", label: "Image", Icon: ImageIcon, accept: "image/*" },
+  { kind: "document", label: "Document", Icon: DocIcon, accept: ".pdf,.txt,.md,.csv,.json,.doc,.docx,.rtf,.pages,application/pdf,text/*" },
+];
+
+// The capture box (with the + menu) and the item list.
 export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string | null }) {
   const [text, setText] = useState("");
+  const [mode, setMode] = useState<"note" | "link">("note");
+  const [adding, setAdding] = useState(false);
+  const [dropping, setDropping] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const addMenu = useRef<HTMLDivElement>(null);
   const byId = new Map(inbox.categories.map((c) => [c.id, c]));
   const items = selected ? inbox.items.filter((i) => i.categoryId === selected) : inbox.items;
 
@@ -41,39 +54,85 @@ export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string 
     const el = box.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight + 2}px`;
+    el.style.height = `${el.scrollHeight}px`;
   }, [text]);
+
+  useEffect(() => {
+    if (!adding) return;
+    const away = (e: MouseEvent) => addMenu.current && !addMenu.current.contains(e.target as Node) && setAdding(false);
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [adding]);
 
   const submit = () => {
     const t = text.trim();
     if (!t) return;
     setText("");
-    inbox.add(t);
+    setMode("note");
+    inbox.add(t, mode);
+  };
+
+  const choose = (kind: (typeof ADD)[number]["kind"]) => {
+    setAdding(false);
+    if (kind === "note" || kind === "link") {
+      setMode(kind);
+      box.current?.focus();
+      return;
+    }
+    const input = picker.current!;
+    input.accept = ADD.find((a) => a.kind === kind)!.accept!;
+    input.click();
+  };
+
+  const files = (list: FileList | null) => {
+    const fs = Array.from(list ?? []);
+    if (fs.length) inbox.upload(fs);
   };
 
   return (
-    <>
-      <textarea
-        ref={box}
-        className="capture"
-        rows={1}
-        value={text}
-        placeholder="Add anything"
-        aria-label="Add to inbox"
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-      />
+    <div
+      className={dropping ? "dropping" : ""}
+      onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDropping(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false); }}
+      onDrop={(e) => { e.preventDefault(); setDropping(false); files(e.dataTransfer.files); }}
+    >
+      <div className="capture">
+        <div className="add" ref={addMenu}>
+          <button className={`plus ${adding ? "on" : ""}`} onClick={() => setAdding(!adding)} aria-label="Add" aria-expanded={adding}>
+            <PlusIcon />
+          </button>
+          {adding && (
+            <div className="menu left">
+              {ADD.map(({ kind, label, Icon }) => (
+                <button key={kind} onClick={() => choose(kind)}><Icon />{label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        <textarea
+          ref={box}
+          rows={1}
+          value={text}
+          placeholder={mode === "link" ? "Paste a link" : "Write a note"}
+          aria-label={mode === "link" ? "Add a link" : "Add a note"}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => !text && setMode("note")}
+          onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); files(e.clipboardData.files); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <input ref={picker} type="file" multiple hidden onChange={(e) => { files(e.target.files); e.target.value = ""; }} />
+      </div>
       <ul className="items">
         {items.map((i) => (
           <Row key={i.id} item={i} category={i.categoryId ? byId.get(i.categoryId) : undefined} inbox={inbox} showCat={!selected} />
         ))}
       </ul>
-    </>
+    </div>
   );
 }
 
@@ -88,7 +147,11 @@ function host(url: string) {
 function Row({ item, category, inbox, showCat }: { item: Item; category?: Category; inbox: Inbox; showCat: boolean }) {
   const [open, setOpen] = useState(false);
   const pending = item.sortedBy === "pending" || item.id.startsWith("tmp-");
-  const main = item.title ?? item.text.replace(/\n\s*\n/g, "\n");
+  const file = item.kind === "image" || item.kind === "document";
+  const text = item.text.replace(/\n\s*\n/g, "\n");
+  // Show the title once there is one, with the note, link, or file name underneath.
+  const heading = item.title ?? (file ? item.fileName : null);
+  const showText = item.kind === "note" && item.sortedBy !== "sure" && (!heading || heading !== text);
 
   return (
     <li className="item">
@@ -96,9 +159,19 @@ function Row({ item, category, inbox, showCat }: { item: Item; category?: Catego
         <span className={`dot ${pending ? "pending" : ""}`} style={pending ? undefined : { background: category?.color ?? "var(--line)" }} />
       </button>
       <div className="body">
-        <div className="text">{main}</div>
+        {heading && <div className="title">{heading}</div>}
+        {showText && <div className={heading ? "text sub" : "text"}>{text}</div>}
+        {item.kind === "link" && !heading && <div className="text">{item.url ?? text}</div>}
         {item.url && <a className="host" href={item.url} target="_blank" rel="noreferrer">{host(item.url)}</a>}
+        {item.kind === "document" && !pending && item.title !== item.fileName && (
+          <a className="host" href={`/api/files/${item.id}`} target="_blank" rel="noreferrer">{item.fileName}</a>
+        )}
       </div>
+      {item.kind === "image" && !item.id.startsWith("tmp-") && (
+        <a href={`/api/files/${item.id}`} target="_blank" rel="noreferrer" className="thumb">
+          <img src={`/api/files/${item.id}`} alt="" />
+        </a>
+      )}
       {showCat && category && !pending && (
         <button className="cat" onClick={() => setOpen(!open)}>{category.name}</button>
       )}

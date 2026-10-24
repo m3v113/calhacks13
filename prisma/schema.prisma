@@ -24,10 +24,15 @@ model Category {
 // F1: anything captured in the Smart Inbox
 model Item {
   id         String    @id @default(cuid())
-  text       String // what you typed or pasted
+  kind       String    @default("note") // "note" | "link" | "image" | "document"
+  text       String // what you typed or pasted; the file name for uploads
   url        String? // first link found in the text
-  title      String? // page title, when the link could be read
+  title      String? // short title: the page title, or one the AI wrote
   summary    String? // page description, when the link could be read
+  fileName   String? // uploads: original file name
+  filePath   String? // uploads: path under data/uploads/
+  mime       String? // uploads: file type
+  extracted  String? // documents: text pulled out of the file
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   sortedBy   String    @default("pending") // "pending" | "rules" | "sure" | "ai" | "user"

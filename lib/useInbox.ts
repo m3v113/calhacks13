@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type Category = { id: string; name: string; color: string; count: number };
 export type Item = {
   id: string;
+  kind: string; // "note" | "link" | "image" | "document"
   text: string;
+  fileName: string | null;
+  mime: string | null;
+  summary: string | null;
   url: string | null;
   title: string | null;
   categoryId: string | null;
@@ -51,10 +55,24 @@ export function useInbox() {
     return () => { clearTimeout(timer.current); clearInterval(s); window.removeEventListener("focus", onFocus); };
   }, [load, loadStatus]);
 
-  const add = useCallback(async (text: string) => {
-    const temp: Item = { id: `tmp-${Date.now()}`, text, url: null, title: null, categoryId: null, sortedBy: "pending", createdAt: new Date().toISOString() };
-    setItems((xs) => [temp, ...xs]);
-    await fetch("/api/items", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
+  const placeholder = (kind: string, text: string, fileName: string | null = null): Item => ({
+    id: `tmp-${Math.random()}`, kind, text, fileName, mime: null, summary: null, url: null, title: null,
+    categoryId: null, sortedBy: "pending", createdAt: new Date().toISOString(),
+  });
+
+  const add = useCallback(async (text: string, kind: "note" | "link" = "note") => {
+    setItems((xs) => [placeholder(kind, text), ...xs]);
+    await fetch("/api/items", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, kind }) });
+    load();
+  }, [load]);
+
+  const upload = useCallback(async (files: File[]) => {
+    setItems((xs) => [...files.map((f) => placeholder(f.type.startsWith("image/") ? "image" : "document", f.name, f.name)), ...xs]);
+    await Promise.all(files.map((f) => {
+      const form = new FormData();
+      form.append("file", f);
+      return fetch("/api/items", { method: "POST", body: form });
+    }));
     load();
   }, [load]);
 
@@ -75,5 +93,5 @@ export function useInbox() {
     return patch(id, { archived: true });
   }, [patch]);
 
-  return { categories, items, ai, add, setCategory, newCategory, archive };
+  return { categories, items, ai, add, upload, setCategory, newCategory, archive };
 }
