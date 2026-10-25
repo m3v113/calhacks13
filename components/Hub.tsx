@@ -74,6 +74,8 @@ export default function Hub() {
     const el = canvas.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      // The New project box scrolls normally.
+      if ((e.target as HTMLElement).closest(".new-project-box") && !e.ctrlKey) return;
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const r = el.getBoundingClientRect();

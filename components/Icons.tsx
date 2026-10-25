@@ -66,3 +66,9 @@ export const UploadIcon = () => (
 export const EditIcon = () => (
   <svg {...p}><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14 6l4 4" /></svg>
 );
+export const LockIcon = () => (
+  <svg {...p}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+);
+export const ScoutIcon = () => (
+  <svg {...p}><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
+);

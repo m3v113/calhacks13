@@ -6,7 +6,7 @@ import type { Item, useInbox } from "@/lib/useInbox";
 import { DRAG } from "./Inbox";
 import Swatches from "./Swatches";
 import InboxPicker, { itemName } from "./InboxPicker";
-import { CloseIcon, EditIcon, GripIcon, MoreIcon, PlusIcon, TrashIcon } from "./Icons";
+import { CloseIcon, EditIcon, GripIcon, LockIcon, MoreIcon, PlusIcon, TrashIcon } from "./Icons";
 
 type Projects = ReturnType<typeof useProjects>;
 type View = { x: number; y: number; z: number };
@@ -182,7 +182,7 @@ export function Lines({ projects, draft }: { projects: Projects; draft: Draft | 
 
 const KIND_TEXT: Record<Kind, string> = {
   space: "A workspace you set up: writing, tasks, and sources, arranged your way.",
-  auto: "The AI breaks it into steps, with explanations, subtasks, and troubleshooting. Give it anything that helps.",
+  auto: "The AI lays it out for you: what to know, what to get, and what to do. Give it anything that helps.",
 };
 
 // Space or Auto, with a line on what each one means.
@@ -300,9 +300,9 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
                       </select>
                     )}
                     <input value={sec.title} aria-label="Section name" onChange={(e) => setSection(i, { title: e.target.value })} />
-                    {sec.type !== "sources" && (
-                      <button aria-label={`Remove ${sec.title}`} onClick={() => setS({ ...s, sections: s.sections.filter((_, j) => j !== i) })}><CloseIcon /></button>
-                    )}
+                    {sec.type === "sources"
+                      ? <span className="np-lock" aria-label="Every project has Sources" data-tip="Every project has Sources"><LockIcon /></span>
+                      : <button aria-label={`Remove ${sec.title}`} onClick={() => setS({ ...s, sections: s.sections.filter((_, j) => j !== i) })}><CloseIcon /></button>}
                   </li>
                 ))}
               </ul>
@@ -325,7 +325,7 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
               )}
               <div className="np-add" ref={pickRef}>
                 <button aria-expanded={picking} onClick={() => setPicking(!picking)}><PlusIcon />From inbox</button>
-                {picking && <InboxPicker inbox={inbox} up exclude={new Set(picked.map((i) => i.id))} onPick={(i) => setPicked([...picked, i])} />}
+                {picking && <InboxPicker inbox={inbox} inline exclude={new Set(picked.map((i) => i.id))} onPick={(i) => setPicked([...picked, i])} />}
               </div>
             </div>
           )}

@@ -27,15 +27,20 @@ const api = (url: string, method: string, body?: object) =>
   fetch(url, { method, headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
 
 
-// A one-line input that saves when you press Enter or leave it.
-function Line({ value, onSave, className, label }: { value: string; onSave: (v: string) => void; className?: string; label: string }) {
+// A one-line field that saves when you press Enter or leave it. `wrap` lets long text run onto more lines.
+function Line({ value, onSave, className, label, wrap }: { value: string; onSave: (v: string) => void; className?: string; label: string; wrap?: boolean }) {
   const [v, setV] = useState(value);
+  const area = useRef<HTMLTextAreaElement>(null);
   useEffect(() => setV(value), [value]);
+  useEffect(() => { const el = area.current; if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } }, [v]);
   const save = () => { const t = v.trim(); if (!t) setV(value); else if (t !== value) onSave(t); };
-  return (
-    <input className={className} value={v} aria-label={label} onChange={(e) => setV(e.target.value)} onBlur={save}
-      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") { setV(value); e.currentTarget.blur(); } }} />
-  );
+  const keys = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+    if (e.key === "Escape") { setV(value); e.currentTarget.blur(); }
+  };
+  return wrap
+    ? <textarea ref={area} rows={1} className={className} value={v} aria-label={label} onChange={(e) => setV(e.target.value)} onBlur={save} onKeyDown={keys} />
+    : <input className={className} value={v} aria-label={label} onChange={(e) => setV(e.target.value)} onBlur={save} onKeyDown={keys} />;
 }
 
 // A project: Scouts on the left, its sections in a grid you can rearrange. Everything saves as you go.
@@ -278,7 +283,7 @@ function Tasks({ section, setSection, planning }: { section: Section; setSection
             ? <button className="check keep" aria-label="Keep this step" data-tip="Keep" onClick={() => change(t.id, { proposed: false })}><CheckIcon /></button>
             : <button className="check" aria-label={t.done ? "Mark not done" : "Mark done"} aria-pressed={t.done} onClick={() => change(t.id, { done: !t.done })}>{t.done && <CheckIcon />}</button>}
           <div className="task-body">
-            <Line className="task-text" label="Task" value={t.text} onSave={(text) => change(t.id, { text })} />
+            <Line wrap className="task-text" label="Task" value={t.text} onSave={(text) => change(t.id, { text })} />
             {t.detail && <div className="task-detail">{t.detail}</div>}
           </div>
           <button className={`icon small ${t.proposed ? "" : "fade"}`} aria-label={t.proposed ? "Remove this step" : "Delete task"} onClick={() => remove(t.id)}><CloseIcon /></button>

@@ -116,10 +116,14 @@ export function queuePlan(id: string) {
   after(() => planAuto(id));
 }
 
-type Plan = { sections: { title: string; explanation: string; subtasks: string[] }[] };
+// The AI picks each section's shape to fit what it holds: a short explanation, a list of points,
+// key facts, or a checklist of things to do.
+const FORMS = ["text", "points", "facts", "checklist"] as const;
+type PlanSection = { title: string; form: string; text: string; items: string[] };
+type Plan = { sections: PlanSection[] };
 const isPlan = (v: unknown): v is Plan =>
   Array.isArray((v as Plan)?.sections) && (v as Plan).sections.every((s) =>
-    typeof s?.title === "string" && typeof s?.explanation === "string" && Array.isArray(s?.subtasks) && s.subtasks.every((t) => typeof t === "string"));
+    typeof s?.title === "string" && typeof s?.form === "string" && typeof s?.text === "string" && Array.isArray(s?.items) && s.items.every((t) => typeof t === "string"));
 const PLAN_SCHEMA = {
   type: "object",
   properties: {
@@ -127,24 +131,39 @@ const PLAN_SCHEMA = {
       type: "array",
       items: {
         type: "object",
-        properties: { title: { type: "string" }, explanation: { type: "string" }, subtasks: { type: "array", items: { type: "string" } } },
-        required: ["title", "explanation", "subtasks"],
+        properties: { title: { type: "string" }, form: { type: "string", enum: [...FORMS] }, text: { type: "string" }, items: { type: "array", items: { type: "string" } } },
+        required: ["title", "form", "text", "items"],
       },
     },
   },
   required: ["sections"],
 };
-const PLAN_SYSTEM = `You break a personal project into the parts that need to be done, or could be done, so someone can finish it.
-Give 4 to 7 sections, in the order they'd be done. Each section has:
-- title: 2 to 5 words (e.g. "Check the ceiling box", "Choose a new fan", "Install the fan")
-- explanation: 2 to 4 sentences: what this part is, how to do it, and what to watch out for (safety first)
-- subtasks: 2 to 6 short, concrete things to do, each starting with a verb
-Always include a "Troubleshooting" section with common problems and fixes as subtasks.
-When hiring help makes sense, include a section for it (who to call, what to ask).
+const PLAN_SYSTEM = `You lay out a personal project so someone can understand it and get it done, without feeling overwhelmed.
+Give 3 to 6 sections, in a sensible order. Pick each section's title and form to best fit what it holds:
+- "text": a short explanation (text: 1 to 3 sentences; items: []). For what this is, how it works, or safety notes.
+- "points": key things to know (items: 2 to 5 short points; text: "").
+- "facts": specs, sizes, or numbers to look for (items: 2 to 5, each "Label: value"; text: "").
+- "checklist": things to do or get (items: 2 to 6 short actions, each starting with a verb; text: "").
+Use at most 2 checklists. Keep every item under 15 words, and plain.
+Titles are 1 to 4 words and fit this project (e.g. "How it works", "What to buy", "Install", "If it wobbles").
+Include a section for common problems and fixes. When hiring help makes sense, say who to call.
 Use the context you're given (pages, notes, saved items) when it helps, and don't invent facts like prices, names, or dates.
-Answer with JSON: {"sections": [{"title": "...", "explanation": "...", "subtasks": ["..."]}]}`;
+Answer with JSON: {"sections": [{"title": "...", "form": "text", "text": "...", "items": []}]}`;
 
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const clean = (t: string) => t.replace(/^[-•*\d.)\s]+/, "").replace(/\s+/g, " ").trim();
+
+// A planned section as one of ours: text, points, and facts are Writing (formatted); checklists are Tasks.
+function toSection(s: PlanSection) {
+  const items = s.items.map(clean).filter(Boolean).slice(0, 8).map((t) => t.slice(0, 300));
+  const text = s.text.replace(/\s+/g, " ").trim().slice(0, 1200);
+  const title = cleanTitle(s.title).slice(0, 40);
+  if (s.form === "checklist" && items.length) return { title, type: "tasks", notes: null, tasks: items };
+  const fact = (t: string) => { const m = t.match(/^([^:]{1,40}):\s*(.+)$/); return m ? `<strong>${esc(m[1])}:</strong> ${esc(m[2])}` : esc(t); };
+  const list = items.length ? `<ul>${items.map((t) => `<li><p>${s.form === "facts" ? fact(t) : esc(t)}</p></li>`).join("")}</ul>` : "";
+  const notes = `${text ? `<p>${esc(text)}</p>` : ""}${list}`;
+  return notes ? { title, type: "writing", notes, tasks: [] } : null;
+}
 
 // What the AI reads for an Auto project: the goal, the context you gave, and the project's sources (with their page text).
 async function planContext(id: string) {
@@ -163,7 +182,7 @@ async function planContext(id: string) {
   ].filter(Boolean).join("\n\n").slice(0, 9000);
 }
 
-// Auto projects: the AI writes the sections (explanation + subtasks). They show as proposed until you keep them.
+// Auto projects: the AI writes the sections, each in the shape that fits it. They show as proposed until you keep them.
 async function planAuto(id: string) {
   if (running.has(id)) return;
   running.add(id);
@@ -175,19 +194,14 @@ async function planAuto(id: string) {
     const context = await planContext(id);
     if (!context) return;
     const a = await chatJSON(PLAN_SYSTEM, context, PLAN_SCHEMA, isPlan, { timeoutMs: 240_000 });
-    const sections = a.sections.map((s) => ({
-      title: cleanTitle(s.title).slice(0, 40),
-      explanation: s.explanation.replace(/\s+/g, " ").trim().slice(0, 1200),
-      subtasks: s.subtasks.map((t) => cleanTitle(t).slice(0, 200)).filter(Boolean).slice(0, 8),
-    })).filter((s) => s.title).slice(0, 8);
+    const sections = a.sections.map(toSection).filter((s) => s && s.title).slice(0, 7) as NonNullable<ReturnType<typeof toSection>>[];
     // The new sections go before Sources and anything you added.
     await db.section.updateMany({ where: { projectId: id }, data: { order: { increment: sections.length } } });
     for (const [order, s] of sections.entries()) {
       await db.section.create({
         data: {
-          projectId: id, type: "step", title: s.title, order, span: 2, proposed: true,
-          notes: s.explanation ? `<p>${esc(s.explanation)}</p>` : null,
-          tasks: { create: s.subtasks.map((text, i) => ({ text, order: i })) },
+          projectId: id, type: s.type, title: s.title, order, span: 1, proposed: true, notes: s.notes,
+          tasks: { create: s.tasks.map((text, i) => ({ text, order: i })) },
         },
       });
     }
