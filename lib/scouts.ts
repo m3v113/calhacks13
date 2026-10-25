@@ -264,9 +264,14 @@ async function runScout(id: string) {
           }, { timeoutMs: 240_000 });
           // A value has to look like one: short, and with a number for fields that are numbers (price, size...).
           const numeric = (f: string) => /price|cost|size|rating|weight|year|dimension|speed|volume|capacity|distance|length|width|height|stars?/i.test(f);
-          const fit = (f: string, v: string) => (v.length <= 30 && (!numeric(f) || /\d/.test(v)) ? v : "");
+          // The model sometimes repeats the field ("Price: Under $10") or writes "N/A" for a missing value.
+          const empty = /^(n\/?a|none|unknown|not (given|listed|stated|specified)|-+|\?)$/i;
+          const fit = (f: string, raw: string) => {
+            const v = raw.replace(new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*`, "i"), "").trim();
+            return v.length <= 30 && !empty.test(v) && (!numeric(f) || /\d/.test(v)) ? v : "";
+          };
           const allFields = a.fields.map((f) => clip(f, 24)).filter(Boolean).slice(0, 4);
-          let options = a.options.filter((o) => pages[o.page - 1] && clip(o.name, 120)).slice(0, 6).map((o) => ({
+          let options = a.options.filter((o) => pages[o.page - 1] && clip(o.name, 120) && !empty.test(clip(o.name, 120))).slice(0, 6).map((o) => ({
             name: clip(o.name, 120), link: pages[o.page - 1].link, values: allFields.map((f, i) => fit(f, clip(o.values[i] ?? "", 60))), why: clip(o.why, 300),
           }));
           // Fields that no option has a value for are dropped.

@@ -10,3 +10,7 @@ export const richText = (t: string) => esc(t)
 
 // Citations as paragraphs, for a Writing section.
 export const citationsHtml = (items: string[]) => items.map((c) => `<p>${richText(c)}</p>`).join("");
+
+// A list the AI wrote as one paragraph ("1. Do this. 2. Do that.") as separate lines.
+export const splitList = (t: string) =>
+  t.split(/\n+|\s*(?:^|\s)\d{1,2}[.)]\s+|\s+[-•*]\s+/).map((x) => x.replace(/^[-•*\d.)\s]+/, "").trim()).filter(Boolean);

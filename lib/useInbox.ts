@@ -13,6 +13,9 @@ export type Item = {
   title: string | null;
   categoryId: string | null;
   projectId?: string | null;
+  dueDate?: string | null;
+  dueTime?: string | null;
+  priority?: number | null;
   sortedBy: string;
   createdAt: string;
 };

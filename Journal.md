@@ -8,7 +8,7 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** round 4 (PR #10): read-only Resources, AI section, project Brain Dump with drag and drop, Brain Dump search, and the Cartesia mic.
+**Working on:** rounds 4 and 5 (PR #10): Resources, AI section, project Brain Dumps, search, the Cartesia mic, and the Tasks tab.
 **Done:** F1 Smart Inbox, now called Brain Dump (PR #5, renamed in PR #7), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
@@ -63,6 +63,22 @@ Ordered. Feature numbers match the plan.
 ---
 
 ## Log
+
+### 2026-10-25 · Round 5: project Brain Dumps, Tasks tab, fixes (PR #10)
+
+Mehvish tried round 4 on her Mac. Added to the same PR.
+
+- **Add as tasks made an empty section:** gemma wrote the list inside the reply ("1. … 2. …") and left items empty. The server now splits such a reply into items, and the page does the same for answers saved before. "Due: 2026-10-30" at the end of a task becomes its date.
+- **Starting categories:** Recipes, Events, School, Home, Other (Wordle was too niche). An empty Wordle starter is swapped on the next load, and a Wordle share still makes its own. The sorting prompt now says to pick an existing category only when the item really is that kind of thing (homework had gone to Recipes). There's a School keyword rule for when the AI is off.
+- **Gaps in the layout:** halves between full-width sections now go into two columns that stack on their own, alternating, instead of rows. A short half no longer leaves a hole under it.
+- **Each project's Brain Dump is its own:** the main Brain Dump (`GET /api/items`) lists only items with no project, so it's the place for things still to be sorted. Adding to a project, dragging onto a card, saving from a Scout, or moving from Resources all put the item only in the project. × or dragging back to the panel moves it back.
+- **Resources:** each page has + (move to the project's Brain Dump, with its title and summary, so the page isn't read or summarized again; only the category is picked) and ×. Removed pages are remembered, so More doesn't bring them back. More now runs a slightly different search each time ("… tutorial", "… tips", …) before later pages. The second page of the same search had drifted to unrelated "SOLVE" sites for a Rubik's Cube project. Pages that don't mention two of the project's main words are left out.
+- **Find tags:** "Price: Price: Under $10" loses the repeated label, and "N/A" values and options named "N/A" are dropped.
+- **New project box:** the Brain Dump row is dashed with a lock and a line on what it is. A line under + Writing, + Tasks, and + AI says what each one is. + AI is new there.
+- **Mic shows text while you speak:** it records in 3-second pieces, each its own recording, and each is transcribed with the same Cartesia call as it comes in. The total audio sent is the same. A word at a break can be split. Cartesia's streaming WebSocket would avoid that, but it needs a key or token in the browser, so it was left for later.
+- **Lines from the circle you drew from:** `ProjectLink.fromSide` and `toSide` are new fields. The other end is the side of the target card nearest where you let go. Old lines use the sides that face each other.
+- **Tasks tab (new):** Brain Dump items and project tasks can have a date, time, and priority (`dueDate` "YYYY-MM-DD", `dueTime` "HH:MM", `priority` 1–3, plus `Item.done`). `GET /api/agenda` lists everything that has one and isn't done, soonest first. On the Hub, the side panel has Brain Dump and Tasks tabs. The calendar icon on a task, or in an item's tray, sets them.
+- **New fields:** `Item.dueDate/dueTime/priority/done`, `Task.dueDate/dueTime/priority`, `ProjectLink.fromSide/toSide`. `prisma db push` adds them without touching data.
 
 ### 2026-10-25 · Round 4: Resources, AI section, project Brain Dump, mic (PR #10)
 

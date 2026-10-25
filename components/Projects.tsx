@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Kind, Line, ProjectCard, Suggestion, useProjects } from "@/lib/useProjects";
+import type { Kind, Line, ProjectCard, Side, Suggestion, useProjects } from "@/lib/useProjects";
 import type { Item, useInbox } from "@/lib/useInbox";
 import { DRAG } from "./Inbox";
 import Swatches from "./Swatches";
@@ -11,7 +11,7 @@ import { CloseIcon, EditIcon, GripIcon, LockIcon, MoreIcon, PlusIcon, TrashIcon 
 
 type Projects = ReturnType<typeof useProjects>;
 type View = { x: number; y: number; z: number };
-export type Draft = { from: string; x: number; y: number; near: string[]; to: string | null };
+export type Draft = { from: string; side: Side; x: number; y: number; near: string[]; to: string | null };
 
 // Closes a popover when you click outside it or press Escape.
 export function useDismiss<T extends HTMLElement>(open: boolean, close: () => void) {
@@ -43,7 +43,7 @@ const SIDES = ["top", "right", "bottom", "left"] as const;
 // drop an inbox item on it to add it, drag its corner to resize it, and drag a circle on its edge to
 // another card to link them. ⋯ renames, recolors, or deletes it.
 export function Card({ project, projects, view, draft, onConnect }: {
-  project: ProjectCard; projects: Projects; view: View; draft: Draft | null; onConnect: (id: string, e: React.PointerEvent) => void;
+  project: ProjectCard; projects: Projects; view: View; draft: Draft | null; onConnect: (id: string, side: Side, e: React.PointerEvent) => void;
 }) {
   const router = useRouter();
   const drag = useRef<{ x: number; y: number; moved: boolean; resize: boolean } | null>(null);
@@ -132,7 +132,7 @@ export function Card({ project, projects, view, draft, onConnect }: {
       </div>
       {SIDES.map((side) => (
         <span key={side} className={`connect ${side}`} aria-label="Drag to another project to link them"
-          onPointerDown={(e) => { e.stopPropagation(); onConnect(project.id, e); }} />
+          onPointerDown={(e) => { e.stopPropagation(); onConnect(project.id, side, e); }} />
       ))}
       {/* Its moves bubble up to the card's handlers. */}
       <span className="resize" aria-label="Resize" onPointerDown={start(true)} />
@@ -141,6 +141,17 @@ export function Card({ project, projects, view, draft, onConnect }: {
 }
 
 const center = (p: ProjectCard) => ({ x: p.canvasX + p.cardW / 2, y: p.canvasY + p.cardH / 2 });
+// The circle in the middle of a card's side.
+export const anchor = (p: ProjectCard, side: Side) => ({
+  x: p.canvasX + (side === "left" ? 0 : side === "right" ? p.cardW : p.cardW / 2),
+  y: p.canvasY + (side === "top" ? 0 : side === "bottom" ? p.cardH : p.cardH / 2),
+});
+// The side of a card that faces a point: lines drawn before sides were saved use it, and so does the card a line is dropped on.
+export function facing(p: ProjectCard, x: number, y: number): Side {
+  const c = center(p);
+  const dx = (x - c.x) / p.cardW, dy = (y - c.y) / p.cardH;
+  return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "bottom" : "top");
+}
 
 // The lines between linked projects, under the cards. Click one to recolor or remove it.
 export function Lines({ projects, draft }: { projects: Projects; draft: Draft | null }) {
@@ -155,7 +166,8 @@ export function Lines({ projects, draft }: { projects: Projects; draft: Draft | 
         {projects.lines.map((l: Line) => {
           const a = byId.get(l.fromId), b = byId.get(l.toId);
           if (!a || !b) return null;
-          const p = center(a), q = center(b);
+          const p = anchor(a, l.fromSide ?? facing(a, center(b).x, center(b).y));
+          const q = anchor(b, l.toSide ?? facing(b, center(a).x, center(a).y));
           return (
             <g key={l.id}>
               <line x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={l.color ?? "var(--muted)"} strokeWidth={3} strokeLinecap="round" />
@@ -169,7 +181,7 @@ export function Lines({ projects, draft }: { projects: Projects; draft: Draft | 
             </g>
           );
         })}
-        {from && <line x1={center(from).x} y1={center(from).y} x2={draft.x} y2={draft.y} stroke="var(--muted)" strokeWidth={3} strokeDasharray="6 6" strokeLinecap="round" />}
+        {from && <line x1={anchor(from, draft.side).x} y1={anchor(from, draft.side).y} x2={draft.x} y2={draft.y} stroke="var(--muted)" strokeWidth={3} strokeDasharray="6 6" strokeLinecap="round" />}
       </svg>
       {open && line && (
         <div className="menu line-menu" ref={ref} style={{ left: open.x, top: open.y }} onPointerDown={(e) => e.stopPropagation()}>
@@ -202,7 +214,7 @@ function KindSwitch({ value, onChange }: { value: Kind; onChange: (k: Kind) => v
   );
 }
 
-const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "Tasks" }];
+const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "Tasks" }, { type: "assistant", label: "AI" }];
 
 // "+" on the Hub: one sentence → a suggested name and kind → for a Space, its sections (reorder, rename,
 // retype, add); for Auto, what the AI should start from → create.
@@ -262,7 +274,9 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
     setDragging(from);
     const move = (ev: PointerEvent) => {
       const rows = Array.from(list.current?.children ?? []) as HTMLElement[];
-      const to = rows.filter((r, j) => j !== from && r.getBoundingClientRect().top + r.offsetHeight / 2 < ev.clientY).length;
+      // The Brain Dump always stays last.
+      const last = order.findIndex((x) => x.type === "sources");
+      const to = Math.min(rows.filter((r, j) => j !== from && r.getBoundingClientRect().top + r.offsetHeight / 2 < ev.clientY).length, last < 0 ? order.length - 1 : last - 1);
       if (to === from) return;
       const next = [...order];
       next.splice(to, 0, next.splice(from, 1)[0]);
@@ -292,7 +306,14 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
           {s.kind === "space" ? (
             <>
               <ul className="np-sections" ref={list}>
-                {s.sections.map((sec, i) => (
+                {s.sections.map((sec, i) => sec.type === "sources" ? (
+                  // The project's own Brain Dump: always there, so it's shown apart, not as a section to edit.
+                  <li key={sec.key ?? i} className="np-dump">
+                    <span className="np-lock" aria-hidden="true"><LockIcon /></span>
+                    <span className="np-dump-name">{names.inbox}</span>
+                    <span className="np-dump-text">This project&apos;s own links, notes, and files</span>
+                  </li>
+                ) : (
                   <li key={sec.key ?? i} className={dragging === i ? "lifted" : ""}>
                     <span className="np-grip" aria-label="Drag to reorder" onPointerDown={startMove(i)}><GripIcon /></span>
                     {sec.type === "sources" ? <span className="np-type">{names.inbox}</span> : (
@@ -310,6 +331,7 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
               <div className="np-add">
                 {TYPES.map((t) => <button key={t.type} onClick={() => addSection(t.type, t.label)}><PlusIcon />{t.label}</button>)}
               </div>
+              <p className="kind-text">Writing is formatted text, like an outline or an essay&apos;s parts. Tasks is a checklist. AI answers requests about the project, like making tasks or citations.</p>
             </>
           ) : (
             <div className="np-start">

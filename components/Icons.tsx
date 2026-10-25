@@ -81,3 +81,6 @@ export const StopIcon = () => (
 export const SparkIcon = () => (
   <svg {...p}><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /><path d="M19 17v4M17 19h4" /></svg>
 );
+export const CalendarIcon = () => (
+  <svg {...p}><rect x="4" y="5" width="16" height="15" rx="2.5" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
+);

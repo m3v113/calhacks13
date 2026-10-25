@@ -2,6 +2,7 @@ import { db } from "./db";
 import { chatJSON, ollamaUp } from "./ollama";
 import { readLink } from "./link";
 import { names } from "./names";
+import { splitList } from "./format";
 
 // The AI section: ask about what's already in the project (make tasks, rewrite a paragraph,
 // make citations, how does this sound). It runs on the local AI only, never the web.
@@ -80,9 +81,16 @@ export async function ask(sectionId: string, q: string): Promise<{ asks: Answer[
       const o = v as Record<string, unknown>;
       return (INTO as readonly unknown[]).includes(o?.into) && typeof o.title === "string" && typeof o.reply === "string" && isStrings(o.items);
     }, { timeoutMs: 240_000 });
+    let reply = a.reply.trim();
+    let items = a.items;
+    // The small model sometimes writes the list in the reply ("1. Do this. 2. Do that."). Tasks and citations are lists, so split it.
+    if ((a.into === "tasks" || a.into === "citations") && !items.length && reply) {
+      items = a.into === "tasks" ? splitList(reply) : reply.split(/\n+/).filter((t) => t.trim());
+      reply = "";
+    }
     const answer: Answer = {
-      q, into: a.into, title: clip(a.title, 40) || "Answer", reply: a.reply.trim().slice(0, 6000),
-      items: a.items.map((t) => clip(t, 600)).filter(Boolean).slice(0, 30), at: new Date().toISOString(),
+      q, into: a.into, title: clip(a.title, 40) || "Answer", reply: reply.slice(0, 6000),
+      items: items.map((t) => clip(t, 600)).filter(Boolean).slice(0, 30), at: new Date().toISOString(),
     };
     if (!answer.reply && !answer.items.length) return { error: "The AI didn't answer. Try asking another way.", status: 502 };
     const asks = [answer, ...readAsks(sec.notes)].slice(0, KEEP);

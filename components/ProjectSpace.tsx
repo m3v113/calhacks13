@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useInbox, type Item } from "@/lib/useInbox";
 import { names } from "@/lib/names";
-import { citationsHtml, host, richText } from "@/lib/format";
+import { citationsHtml, host, richText, splitList } from "@/lib/format";
 import type { Kind } from "@/lib/useProjects";
 import ItemView from "./ItemView";
 import Writing from "./Writing";
@@ -14,9 +14,10 @@ import InboxPicker, { itemName } from "./InboxPicker";
 import Scouts, { type ScoutDraft } from "./Scouts";
 import { Categories, DRAG, InboxList } from "./Inbox";
 import Mic from "./Mic";
+import { DuePicker } from "./Due";
 import { BackIcon, CheckIcon, CloseIcon, GripIcon, PanelIcon, PlusIcon, RefreshIcon, ScoutIcon, SparkIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
 
-type Task = { id: string; text: string; detail: string | null; proposed: boolean; done: boolean };
+type Task = { id: string; text: string; detail: string | null; proposed: boolean; done: boolean; dueDate: string | null; dueTime: string | null; priority: number | null };
 type Section = { id: string; type: string; title: string; span: number; notes: string | null; proposed: boolean; tasks: Task[] };
 type Linked = { id: string; title: string; color: string | null; items: Item[] };
 type Project = {
@@ -30,20 +31,24 @@ const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "T
 // An item dragged out of the project's Brain Dump (dropping it on the main Brain Dump takes it out of the project).
 const PDRAG = "application/x-project-item";
 
-// Sections sit in rows of two halves or one full width. A half with no half next to it fills its row,
-// so there are never empty gaps.
+// Full-width sections take a row each. Halves between them go into two columns that stack on their own
+// (first, third, … on the left; second, fourth, … on the right), so a short half never leaves a gap
+// under it. A half with no other half next to it is shown full width.
+type Band = { wide: Section } | { cols: [Section[], Section[]] };
 function layout(sections: Section[]) {
+  const bands: Band[] = [];
   const alone = new Set<string>();
-  const row = new Map<string, number>();
-  let r = 0;
-  for (let i = 0; i < sections.length; i++, r++) {
-    const s = sections[i];
-    row.set(s.id, r);
-    if (s.span === 2) continue;
-    if (sections[i + 1]?.span === 1) row.set(sections[++i].id, r);
-    else alone.add(s.id);
+  let run: Section[] = [];
+  const flush = () => {
+    if (run.length === 1) { bands.push({ wide: run[0] }); alone.add(run[0].id); }
+    else if (run.length) bands.push({ cols: [run.filter((_, i) => i % 2 === 0), run.filter((_, i) => i % 2 === 1)] });
+    run = [];
+  };
+  for (const s of sections) {
+    if (s.span === 2) { flush(); bands.push({ wide: s }); } else run.push(s);
   }
-  return { alone, row };
+  flush();
+  return { bands, alone };
 }
 
 function stored<T>(key: string, fallback: T): T {
@@ -123,7 +128,7 @@ export default function ProjectSpace({ id }: { id: string }) {
     );
   }
   if (!project) return <div className="space" />;
-  const { alone } = layout(project.sections);
+  const { bands, alone } = layout(project.sections);
 
   const update = (change: Partial<Project>) => setProject((p) => (p ? { ...p, ...change } : p));
   const save = (body: object) => api(`/api/projects/${id}`, "PATCH", body);
@@ -174,13 +179,7 @@ export default function ProjectSpace({ id }: { id: string }) {
     if (!moved || j < 0) return;
     list.splice(side === "left" || side === "top" ? j : j + 1, 0, moved);
     const halves = side === "left" || side === "right";
-    let next = list.map((s) => (halves && (s.id === from || s.id === to) ? { ...s, span: 1 } : s));
-    // Side by side means the same row. If the half before them would pair with one of them instead, it goes full width.
-    const { row } = layout(next);
-    if (halves && row.get(from) !== row.get(to)) {
-      const first = next.findIndex((s) => s.id === from || s.id === to);
-      if (first > 0) next = next.map((s, i) => (i === first - 1 ? { ...s, span: 2 } : s));
-    }
+    const next = list.map((s) => (halves && (s.id === from || s.id === to) ? { ...s, span: 1 } : s));
     update({ sections: next });
     save({ order: next.map((s) => s.id) });
     for (const s of next) if (project.sections.find((x) => x.id === s.id)?.span !== s.span) api(`/api/sections/${s.id}`, "PATCH", { span: s.span });
@@ -226,6 +225,42 @@ export default function ProjectSpace({ id }: { id: string }) {
     window.addEventListener("pointerup", up);
   };
 
+  const renderSection = (s: Section) => (
+            <section key={s.id} data-section={s.id}
+              className={`section ${s.span === 2 || alone.has(s.id) ? "wide" : ""} ${moving?.id === s.id ? "lifted" : ""} ${target?.id === s.id ? `drop-${target.side}` : ""}`}
+              style={moving?.id === s.id ? { transform: `translate(${moving.dx}px, ${moving.dy}px)` } : undefined}
+            >
+              <div className="section-top" onPointerDown={startMove(s.id)}>
+                <span className="grip" aria-hidden="true"><GripIcon /></span>
+                <Line className="section-title" label="Section name" value={s.title} onSave={(title) => patchSection(s.id, { title })} />
+                {s.type === "resources" && (
+                  <button className="icon small fade" aria-label="More resources" data-tip="More" disabled={more?.id === s.id && more.busy}
+                    onClick={() => moreResources(s)}><RefreshIcon /></button>
+                )}
+                {!(alone.has(s.id) && s.span === 1) && (
+                  <button className="icon small fade" aria-label={s.span === 2 ? "Half width" : "Full width"} data-tip={s.span === 2 ? "Half width" : "Full width"}
+                    onClick={() => patchSection(s.id, { span: s.span === 2 ? 1 : 2 })}><WidthIcon /></button>
+                )}
+                {s.type !== "sources" && s.type !== "resources" && (
+                  <button className="icon small fade" aria-label={`Delete ${s.title}`} data-tip="Delete section" onClick={() => removeSection(s)}><TrashIcon /></button>
+                )}
+              </div>
+              {s.type === "tasks" && <Tasks section={s} setSection={setSection} onScout={toScout} planning={planning && s.id === project.sections.find((x) => x.type === "tasks")?.id} />}
+              {s.type === "step" && (
+                <>
+                  <Writing label={`${s.title}: how to`} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />
+                  <Tasks section={s} setSection={setSection} onScout={toScout} planning={false} />
+                </>
+              )}
+              {s.type === "writing" && <Writing label={s.title} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />}
+              {s.type === "sources" && <Sources project={project} inbox={inbox} reload={load} onOpen={setViewing} link={link} unlink={unlink} />}
+              {s.type === "resources" && <Resources section={s} busy={more?.id === s.id && more.busy} note={more?.id === s.id ? more.note : null}
+                onChange={(notes) => patchSection(s.id, { notes })}
+                onMove={(h) => api("/api/items", "POST", { text: h.link, title: h.title, summary: h.description || h.title, projectId: id }).then(load)} />}
+              {s.type === "assistant" && <Assistant section={s} setSection={setSection} projectId={id} onAdded={load} />}
+            </section>
+  );
+
   return (
     <div className="space">
       <header className="space-top">
@@ -256,39 +291,13 @@ export default function ProjectSpace({ id }: { id: string }) {
               <div className="pending-lines" aria-label="Writing the steps"><span /><span /><span /><em>Working out the steps…</em></div>
             </section>
           )}
-          {project.sections.map((s) => (
-            <section key={s.id} data-section={s.id}
-              className={`section ${s.span === 2 || alone.has(s.id) ? "wide" : ""} ${moving?.id === s.id ? "lifted" : ""} ${target?.id === s.id ? `drop-${target.side}` : ""}`}
-              style={moving?.id === s.id ? { transform: `translate(${moving.dx}px, ${moving.dy}px)` } : undefined}
-            >
-              <div className="section-top" onPointerDown={startMove(s.id)}>
-                <span className="grip" aria-hidden="true"><GripIcon /></span>
-                <Line className="section-title" label="Section name" value={s.title} onSave={(title) => patchSection(s.id, { title })} />
-                {s.type === "resources" && (
-                  <button className="icon small fade" aria-label="More resources" data-tip="More" disabled={more?.id === s.id && more.busy}
-                    onClick={() => moreResources(s)}><RefreshIcon /></button>
-                )}
-                {!(alone.has(s.id) && s.span === 1) && (
-                  <button className="icon small fade" aria-label={s.span === 2 ? "Half width" : "Full width"} data-tip={s.span === 2 ? "Half width" : "Full width"}
-                    onClick={() => patchSection(s.id, { span: s.span === 2 ? 1 : 2 })}><WidthIcon /></button>
-                )}
-                {s.type !== "sources" && s.type !== "resources" && (
-                  <button className="icon small fade" aria-label={`Delete ${s.title}`} data-tip="Delete section" onClick={() => removeSection(s)}><TrashIcon /></button>
-                )}
+          {bands.map((band) => ("wide" in band
+            ? <Fragment key={band.wide.id}>{renderSection(band.wide)}</Fragment>
+            : (
+              <div key={band.cols[0][0].id} className="band">
+                {band.cols.map((col, i) => <div key={i} className="band-col">{col.map(renderSection)}</div>)}
               </div>
-              {s.type === "tasks" && <Tasks section={s} setSection={setSection} onScout={toScout} planning={planning && s.id === project.sections.find((x) => x.type === "tasks")?.id} />}
-              {s.type === "step" && (
-                <>
-                  <Writing label={`${s.title}: how to`} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />
-                  <Tasks section={s} setSection={setSection} onScout={toScout} planning={false} />
-                </>
-              )}
-              {s.type === "writing" && <Writing label={s.title} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />}
-              {s.type === "sources" && <Sources project={project} inbox={inbox} reload={load} onOpen={setViewing} link={link} unlink={unlink} />}
-              {s.type === "resources" && <Resources section={s} busy={more?.id === s.id && more.busy} note={more?.id === s.id ? more.note : null} />}
-              {s.type === "assistant" && <Assistant section={s} setSection={setSection} projectId={id} onAdded={load} />}
-            </section>
-          ))}
+            )))}
         </main>
 
         {panel && (
@@ -345,6 +354,7 @@ function Tasks({ section, setSection, planning, onScout }: {
             <Line wrap className="task-text" label="Task" value={t.text} onSave={(text) => change(t.id, { text })} />
             {t.detail && <div className="task-detail">{t.detail}</div>}
           </div>
+          <DuePicker due={t} onChange={(d) => change(t.id, d)} />
           <button className="icon small fade" aria-label="Send to Scouts" data-tip="Send to Scouts" onClick={() => onScout(t.text, t.id)}><ScoutIcon /></button>
           <button className="icon small fade" aria-label="Delete task" onClick={() => remove(t.id)}><CloseIcon /></button>
         </li>
@@ -382,6 +392,9 @@ function Sources({ project, inbox, reload, onOpen, link, unlink }: {
   const [up, setUp] = useState(false);
   const [over, setOver] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
+  const spoken = useRef(false);
+  const latest = useRef(text);
+  latest.current = text;
   const ref = useDismiss<HTMLDivElement>(picking, () => setPicking(false));
   const color = new Map(inbox.categories.map((c) => [c.id, c.color]));
   const mine = new Set(project.items.map((i) => i.id));
@@ -447,7 +460,8 @@ function Sources({ project, inbox, reload, onOpen, link, unlink }: {
         <input value={text} placeholder="Paste a link or write a note" aria-label="Add a source"
           onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) add(); }}
           onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); upload(e.clipboardData.files); } }} />
-        <Mic onText={(t) => (text.trim() ? setText(`${text.trim()} ${t}`) : add(t))} />
+        <Mic onStart={() => { spoken.current = !text.trim(); }} onText={(t) => setText((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t))}
+          onDone={() => { if (spoken.current) add(latest.current.trim()); }} />
         <button className="icon small" aria-label="Upload a file" data-tip="Upload" onClick={() => picker.current?.click()}><UploadIcon /></button>
         <input ref={picker} type="file" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ""; }} />
         <div className="add-linked" ref={ref}>
@@ -462,10 +476,16 @@ function Sources({ project, inbox, reload, onOpen, link, unlink }: {
 
 type Hit = { title: string; link: string; description: string };
 
-// Resources: pages to read, with what each one offers. Read-only; the refresh button above adds more.
-function Resources({ section, busy, note }: { section: Section; busy: boolean; note: string | null }) {
-  let hits: Hit[] = [];
-  try { hits = JSON.parse(section.notes ?? "").hits ?? []; } catch {}
+// Resources: pages to read, with what each one offers. The refresh button above adds more. Each page can be
+// moved to the project's Brain Dump (its summary comes along, so the page isn't read again) or removed.
+function Resources({ section, busy, note, onChange, onMove }: {
+  section: Section; busy: boolean; note: string | null; onChange: (notes: string) => void; onMove: (h: Hit) => void;
+}) {
+  let data: { hits: Hit[]; gone?: string[] } = { hits: [] };
+  try { data = JSON.parse(section.notes ?? ""); } catch {}
+  const hits = data.hits ?? [];
+  // Removed and moved pages are remembered, so More doesn't bring them back.
+  const drop = (h: Hit) => onChange(JSON.stringify({ ...data, hits: hits.filter((x) => x.link !== h.link), gone: [...(data.gone ?? []), h.link] }));
   return (
     <>
       <ul className="resources">
@@ -476,6 +496,10 @@ function Resources({ section, busy, note }: { section: Section; busy: boolean; n
               {h.description && <span className="res-about">{h.description}</span>}
               <span className="res-host">{host(h.link)}</span>
             </a>
+            <div className="res-actions">
+              <button className="icon small" aria-label={`Move to ${names.inbox}`} data-tip={`Move to ${names.inbox}`} onClick={() => { onMove(h); drop(h); }}><PlusIcon /></button>
+              <button className="icon small" aria-label="Remove" data-tip="Remove" onClick={() => drop(h)}><CloseIcon /></button>
+            </div>
           </li>
         ))}
       </ul>
@@ -519,7 +543,9 @@ function Assistant({ section, setSection, projectId, onAdded }: {
   const add = async (a: Ask) => {
     setAdded((cur) => new Set(cur).add(a.at));
     const paras = (t: string) => t.split(/\n\s*\n/).map((p) => `<p>${richText(p.trim())}</p>`).join("");
-    const body = a.into === "tasks" ? { type: "tasks", title: a.title, tasks: a.items }
+    // Answers saved before lists were split keep the list in the reply.
+    const tasks = a.items.length ? a.items : splitList(a.reply);
+    const body = a.into === "tasks" ? { type: "tasks", title: a.title, tasks }
       : { type: "writing", title: a.title, notes: a.into === "citations" ? citationsHtml(a.items) : `${paras(a.reply)}${a.items.length ? `<ul>${a.items.map((t) => `<li><p>${richText(t)}</p></li>`).join("")}</ul>` : ""}` };
     await api(`/api/projects/${projectId}/sections`, "POST", body);
     onAdded();

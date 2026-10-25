@@ -10,6 +10,7 @@ const WORDLE = /wordle\s*([\d,]+)\s*([1-6x])\/6/i;
 const RULES: [string, RegExp][] = [
   ["Wordle", /🟩|🟨/],
   ["Recipes", /recipe|ingredients?|\b(tbsp|tsp|cups?)\b|\bbake\b|allrecipes|nytcooking|seriouseats|bonappetit/i],
+  ["School", /\b(homework|assignment|essay|exam|midterm|quiz|lecture|syllabus|class|professor)\b/i],
   ["Events", /\b(party|meetup|rsvp|concert|tickets?|festival|wedding|birthday|eventbrite|lu\.ma|partiful)\b|\b\d{1,2}(:\d\d)?\s?(am|pm)\b|\b(tonight|tomorrow)\b/i],
 ];
 
@@ -32,7 +33,8 @@ const SCHEMA = {
 const SYSTEM = `You organize items in a personal inbox. For each item, give a category, a short title, and a summary.
 category: pick the single best category from the existing list when one fits. Check every existing category, including empty ones and ones the user made; their names and the items already in them show what belongs there.
 If none fits, invent a new category: 1 or 2 words, Title Case, plural when natural (e.g. "Books", "Travel", "Home Repairs").
-Use "Other" only when the item is meaningless. Wordle scores always go in "Wordle".
+Only pick an existing category when the item really is that kind of thing: homework is not a recipe, and a repair is not an event. Otherwise invent one.
+Use "Other" only when the item is meaningless.
 If the user moved similar items to a category, use that category.
 If the item mentions an existing category by name, that category is very likely right.
 title: 2 to 6 words that say what the item is, in Title Case, no quotes or trailing punctuation (e.g. "Grandma's Banana Bread", "Maya's Birthday Party").

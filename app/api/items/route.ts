@@ -4,12 +4,14 @@ import { firstUrl } from "@/lib/link";
 import { MAX_BYTES, extractText, saveUpload } from "@/lib/files";
 import { sortItem, sweep } from "@/lib/sort";
 
-// The whole inbox: categories (with counts) and items that aren't archived.
+// The Brain Dump: categories (with counts) and items that aren't archived. Items in a project live in that
+// project's own Brain Dump, so they aren't listed here; the main one holds what's still to be sorted into projects.
 export async function GET() {
   await ensureSeed();
+  const where = { archived: false, projectId: null };
   const [categories, items] = await Promise.all([
-    db.category.findMany({ orderBy: { createdAt: "asc" }, include: { _count: { select: { items: { where: { archived: false } } } } } }),
-    db.item.findMany({ where: { archived: false }, orderBy: { createdAt: "desc" }, take: 500, omit: { extracted: true } }),
+    db.category.findMany({ orderBy: { createdAt: "asc" }, include: { _count: { select: { items: { where } } } } }),
+    db.item.findMany({ where, orderBy: { createdAt: "desc" }, take: 500, omit: { extracted: true } }),
   ]);
   after(sweep);
   return NextResponse.json({
@@ -35,13 +37,17 @@ export async function POST(req: Request) {
     return NextResponse.json(item, { status: 201 });
   }
 
-  const { text, kind, projectId } = await req.json().catch(() => ({}));
+  const { text, kind, projectId, title, summary } = await req.json().catch(() => ({}));
   const clean = typeof text === "string" ? text.trim().slice(0, 10_000) : "";
   if (!clean) return NextResponse.json({ error: "empty" }, { status: 400 });
   const url = firstUrl(clean);
   // Typing makes a note; a bare link (or one added as a link) makes a link.
   const isLink = url !== null && (kind === "link" || clean === url);
-  const item = await db.item.create({ data: { kind: isLink ? "link" : "note", text: clean, url, projectId: await projectOf(projectId) } });
+  // A link saved from Resources or a Scout comes with its title and summary, so its page isn't read again.
+  const given = isLink && typeof title === "string" && title.trim() && typeof summary === "string" && summary.trim()
+    ? { title: title.trim().slice(0, 200), titleBy: "user", summary: summary.trim().slice(0, 1200), overview: summary.trim().slice(0, 1200), overviewBy: "user" }
+    : {};
+  const item = await db.item.create({ data: { kind: isLink ? "link" : "note", text: clean, url, projectId: await projectOf(projectId), ...given } });
   after(() => sortItem(item.id));
   return NextResponse.json(item, { status: 201 });
 }

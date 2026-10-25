@@ -120,9 +120,9 @@ export default function Scouts({ projectId, draft, onAdded }: { projectId: strin
     await api(`/api/projects/${projectId}/sections`, "POST", sec);
     onAdded();
   };
-  const saveLink = async (key: string, link: string) => {
+  const saveLink = async (key: string, link: string, title?: string, summary?: string) => {
     mark(key);
-    await api("/api/items", "POST", { text: link, projectId });
+    await api("/api/items", "POST", { text: link, projectId, title, summary });
     onAdded();
   };
 
@@ -179,7 +179,7 @@ export default function Scouts({ projectId, draft, onAdded }: { projectId: strin
 }
 
 function Result({ scout, saved, onSaveLink, onAdd }: {
-  scout: Scout; saved: Set<string>; onSaveLink: (key: string, link: string) => void; onAdd: () => void;
+  scout: Scout; saved: Set<string>; onSaveLink: (key: string, link: string, title?: string, summary?: string) => void; onAdd: () => void;
 }) {
   const r = scout.result!;
   const added = saved.has(`${scout.id}:section`);
@@ -196,7 +196,7 @@ function Result({ scout, saved, onSaveLink, onAdd }: {
               <li key={key}>
                 <div className="opt-top">
                   <a href={o.link} target="_blank" rel="noreferrer" className="opt-name">{o.name}</a>
-                  <button className="icon small" aria-label={`Save ${o.name} to ${names.inbox}`} data-tip={`Save to ${names.inbox}`} disabled={saved.has(key)} onClick={() => onSaveLink(key, o.link)}>
+                  <button className="icon small" aria-label={`Save ${o.name} to ${names.inbox}`} data-tip={`Save to ${names.inbox}`} disabled={saved.has(key)} onClick={() => onSaveLink(key, o.link, o.name, o.why)}>
                     {saved.has(key) ? <CheckIcon /> : <PlusIcon />}
                   </button>
                 </div>

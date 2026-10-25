@@ -55,7 +55,7 @@ function fromTemplate(goal: string): Suggestion {
 export function tidySections(list: { type: string; title: string }[]): Sec[] {
   const out: Sec[] = [];
   for (const s of list) {
-    if (!(PLANNED as readonly string[]).includes(s.type)) continue;
+    if (!([...PLANNED, "assistant"] as string[]).includes(s.type)) continue;
     if (s.type === "sources" && out.some((x) => x.type === "sources")) continue;
     out.push(s.type === "sources" ? SOURCES : { type: s.type as SectionType, title: capitalize(cleanTitle(s.title)).slice(0, 40) || capitalize(s.type) });
   }
@@ -213,14 +213,26 @@ async function checkLinks(html: string) {
 
 // Resources: a read-only list of pages, saved as JSON in the section's notes. `start` is how far
 // into the search results it has got, so More asks for the next page.
-export type Resources = { query: string; start: number; hits: Hit[] };
+export type Resources = { query: string; start: number; round?: number; hits: Hit[]; gone?: string[] };
 const resourcesQuery = (title: string, goal: string | null) => `${goal ?? title} guide`.slice(0, 120);
+// More asks a slightly different search each time (a second page of the same search drifts off topic fast),
+// then goes on to later pages once these run out.
+const moreQueries = (title: string, goal: string | null) => [`${goal ?? title} tutorial`, `${goal ?? title} tips`, `${title} for beginners`, `${goal ?? title} reddit`].map((q) => q.slice(0, 120));
 export function readResources(notes: string | null): Resources {
   try {
     const r = JSON.parse(notes ?? "");
-    if (Array.isArray(r?.hits)) return { query: String(r.query ?? ""), start: Number(r.start) || 0, hits: r.hits };
+    if (Array.isArray(r?.hits)) return { query: String(r.query ?? ""), start: Number(r.start) || 0, round: Number(r.round) || 0, hits: r.hits, gone: Array.isArray(r.gone) ? r.gone : [] };
   } catch {}
-  return { query: "", start: 0, hits: [] };
+  return { query: "", start: 0, round: 0, hits: [] };
+}
+// Pages that share none of the project's main words are off topic (e.g. "SOLVE, an environmental non-profit"
+// for "solve a Rubik's Cube"): a page has to mention at least two of them, or the one there is.
+const STOP = new Set(["learn", "learning", "how", "with", "make", "from", "this", "that", "your", "into", "about", "what", "best", "guide", "need", "want", "project", "the", "and", "for"]);
+function onTopic(hits: Hit[], title: string, goal: string | null) {
+  const words = [...new Set(`${title} ${goal ?? ""}`.toLowerCase().replace(/[’']s\b/g, "").match(/[\p{L}\p{N}]{3,}/gu) ?? [])].filter((w) => !STOP.has(w));
+  if (!words.length) return hits;
+  const need = Math.min(2, words.length);
+  return hits.filter((h) => { const t = `${h.title} ${h.description}`.toLowerCase(); return words.filter((w) => t.includes(w)).length >= need; });
 }
 
 const SITES_SYSTEM = `You suggest well-known, real websites or guides that would help with a personal project.
@@ -251,8 +263,9 @@ async function suggestSites(project: string, have: Hit[]): Promise<Hit[]> {
 async function resourcesFor(title: string, goal: string | null): Promise<Resources | null> {
   const query = resourcesQuery(title, goal);
   if (!searchReady()) return null;
-  const hits = await search(query);
-  return Array.isArray(hits) && hits.length ? { query, start: 0, hits: hits.slice(0, 6) } : null;
+  const got = await search(query);
+  const hits = Array.isArray(got) ? onTopic(got, title, goal) : [];
+  return hits.length ? { query, start: 0, round: 0, hits: hits.slice(0, 6) } : null;
 }
 
 // More resources, when you press the refresh button: the next page of the search, or more sites from the AI.
@@ -264,14 +277,17 @@ export async function moreResources(id: string): Promise<{ notes: string; note: 
   let fresh: Hit[] = [];
   let note: string | null = null;
   if (searchReady()) {
-    const got = await search(r.query, r.start + 10);
+    const { title, goal } = sec.project;
+    const variants = moreQueries(title, goal);
+    const round = r.round ?? 0;
+    const got = round < variants.length ? await search(variants[round]) : await search(r.query, r.start + 10);
     if (typeof got === "string") note = `The search didn't work (${got}). Try again later.`;
     else {
-      r.start += 10;
-      fresh = got.filter((h) => !r.hits.some((x) => x.link === h.link)).slice(0, 6);
+      if (round < variants.length) r.round = round + 1; else r.start += 10;
+      fresh = onTopic(got, title, goal).filter((h) => !r.hits.some((x) => x.link === h.link) && !r.gone?.includes(h.link)).slice(0, 6);
     }
   } else {
-    fresh = await suggestSites([sec.project.title, sec.project.goal].filter(Boolean).join(": "), r.hits);
+    fresh = (await suggestSites([sec.project.title, sec.project.goal].filter(Boolean).join(": "), r.hits)).filter((h) => !r.gone?.includes(h.link));
   }
   if (!fresh.length && !note) note = "No more found.";
   r.hits = [...r.hits, ...fresh];

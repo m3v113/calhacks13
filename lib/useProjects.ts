@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 
 export type Kind = "space" | "auto";
 export type ProjectCard = { id: string; title: string; color: string | null; kind: Kind; canvasX: number; canvasY: number; cardW: number; cardH: number };
-export type Line = { id: string; fromId: string; toId: string; color: string | null };
+export type Side = "top" | "right" | "bottom" | "left";
+export type Line = { id: string; fromId: string; toId: string; color: string | null; fromSide: Side | null; toSide: Side | null };
 export type SectionDraft = { type: string; title: string; key?: string }; // key: only for lists on screen
 export type Suggestion = { title: string; kind: Kind; sections: SectionDraft[]; by: "ai" | "template" };
 
@@ -61,9 +62,9 @@ export function useProjects() {
     load();
   }, [load]);
 
-  const connect = useCallback(async (fromId: string, toId: string) => {
-    const r = await fetch("/api/links", { method: "POST", ...json({ fromId, toId }) });
-    if (r.ok) { const l: Line = await r.json(); setLines((ls) => (ls.some((x) => x.id === l.id) ? ls : [...ls, l])); }
+  const connect = useCallback(async (fromId: string, toId: string, fromSide?: string, toSide?: string) => {
+    const r = await fetch("/api/links", { method: "POST", ...json({ fromId, toId, fromSide, toSide }) });
+    if (r.ok) { const l: Line = await r.json(); setLines((ls) => [...ls.filter((x) => x.id !== l.id), l]); }
   }, []);
   const recolorLine = useCallback((id: string, color: string) => {
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, color } : l)));
