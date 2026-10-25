@@ -545,6 +545,10 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .find input { flex: 1; min-width: 0; border: 0 !important; outline: none; background: none !important; padding: 7px 0 !important; color: var(--ink); }
 .find .icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
 .find .icon svg { width: 14px; height: 14px; }
+.sorts { padding: 8px 0 0; }
+.item .in-project { display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.item .in-project:hover { color: var(--ink); }
+.item .in-project .dot { width: 8px; height: 8px; }
 .find-none { font-size: 14px; color: var(--muted); margin: 12px 4px; }
 
 /* The Project Dump */

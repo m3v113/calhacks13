@@ -13,6 +13,7 @@ export type Item = {
   title: string | null;
   categoryId: string | null;
   projectId?: string | null;
+  project?: { id: string; title: string; color: string | null } | null;
   dueDate?: string | null;
   dueTime?: string | null;
   priority?: number | null;

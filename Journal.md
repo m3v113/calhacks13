@@ -8,7 +8,7 @@ The running log for Oven: what's done, what's next, and why. Newest entries go a
 
 ## Now
 
-**Working on:** rounds 4 to 8 (PR #10): Resources, AI section, Project Dumps, search, the live Cartesia mic, and the Tasks page. Next: a voice feature for the Cartesia track, once Mehvish picks one (`plans/cartesia-voice.md`).
+**Working on:** Project Dump items staying in the Pantry, with an Unsorted / In projects filter (PR #13). Next: a voice feature for the Cartesia track, once Mehvish picks one (`plans/cartesia-voice.md`).
 **Done:** F1 Smart Inbox, now called Pantry (PR #5, renamed Brain Dump in PR #7, Pantry in round 8), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
@@ -63,6 +63,13 @@ Ordered. Feature numbers match the plan.
 ---
 
 ## Log
+
+### 2026-10-25 · Project Dump items stay in the Pantry (PR #13)
+
+- **Change of plans:** adding something to a Project Dump no longer takes it out of the Pantry. The Pantry now lists everything, and an item in a project shows the project's name under it (click it to open the project).
+- **Filter:** All, Unsorted, and In projects under the Pantry's search box. Unsorted is what isn't in a project yet.
+- An item is still in one project at a time (`Item.projectId`). **From Pantry** in a project and in the New project box only offers Unsorted items, so picking one never pulls it out of another project. × in a Project Dump takes it out of the project only; deleting a project leaves its items in the Pantry as Unsorted.
+- Category counts in the sidebar now count project items too.
 
 ### 2026-10-25 · Done group in Tasks, no lock icon (PR #12)
 

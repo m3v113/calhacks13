@@ -5,14 +5,14 @@ import { MAX_BYTES, extractText, saveUpload } from "@/lib/files";
 import { sortItem, sweep } from "@/lib/sort";
 import { dueFields } from "@/lib/due";
 
-// The Pantry: categories (with counts) and items that aren't archived. Items in a project live in that
-// project's own Pantry, so they aren't listed here; the main one holds what's still to be sorted into projects.
+// The Pantry: categories (with counts) and every item that isn't archived. An item added to a project's
+// Project Dump stays here too, with that project, so the Pantry can show what's sorted into projects and what isn't.
 export async function GET() {
   await ensureSeed();
-  const where = { archived: false, projectId: null };
+  const where = { archived: false };
   const [categories, items] = await Promise.all([
     db.category.findMany({ orderBy: { createdAt: "asc" }, include: { _count: { select: { items: { where } } } } }),
-    db.item.findMany({ where, orderBy: { createdAt: "desc" }, take: 500, omit: { extracted: true } }),
+    db.item.findMany({ where, orderBy: { createdAt: "desc" }, take: 500, omit: { extracted: true }, include: { project: { select: { id: true, title: true, color: true } } } }),
   ]);
   after(sweep);
   return NextResponse.json({

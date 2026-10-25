@@ -125,7 +125,7 @@ export function Card({ project, projects, view, draft, onConnect }: {
             <Swatches value={project.color} onPick={(color) => projects.save(project.id, { color })} />
             <button className="danger" onClick={() => {
               setMenu(false);
-              if (confirm(`Delete "${project.title}"? Its Project Dump goes back to the ${names.inbox}.`)) projects.remove(project.id);
+              if (confirm(`Delete "${project.title}"? Its Project Dump stays in the ${names.inbox}.`)) projects.remove(project.id);
             }}><TrashIcon />Delete</button>
           </div>
         )}
