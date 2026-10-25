@@ -2,10 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useInbox } from "@/lib/useInbox";
 import { useProjects } from "@/lib/useProjects";
-import { Card, Lines, NewProject, type Draft } from "./Projects";
+import { Card, Lines, NewProject, facing, type Draft } from "./Projects";
+import type { Side } from "@/lib/useProjects";
 import { Categories, InboxList } from "./Inbox";
 import { PanelIcon } from "./Icons";
 import Nav from "./Nav";
+import Agenda from "./Agenda";
+import ItemView from "./ItemView";
 import { names } from "@/lib/names";
 
 type View = { x: number; y: number; z: number };
@@ -29,6 +32,8 @@ export default function Hub() {
   const projects = useProjects();
   const [selected, setSelected] = useState<string | null>(null);
   const [panel, setPanel] = useState(true);
+  const [tab, setTab] = useState<"dump" | "tasks">("dump");
+  const [viewing, setViewing] = useState<string | null>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, z: 1 });
   const [dragging, setDragging] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
@@ -40,14 +45,14 @@ export default function Hub() {
     const r = canvas.current!.getBoundingClientRect();
     return { x: (clientX - r.left - view.x) / view.z, y: (clientY - r.top - view.y) / view.z };
   };
-  const connect = (from: string, e: React.PointerEvent) => {
+  const connect = (from: string, side: Side, e: React.PointerEvent) => {
     // Where the line ends, the cards close to it (they show their circles), and the card under it.
     const at = (cx: number, cy: number): Draft => {
       const { x, y } = toCanvas(cx, cy);
       const near = projects.projects.filter((p) =>
         Math.hypot(Math.max(p.canvasX - x, 0, x - p.canvasX - p.cardW), Math.max(p.canvasY - y, 0, y - p.canvasY - p.cardH)) < 160).map((p) => p.id);
       const to = (document.elementFromPoint(cx, cy) as HTMLElement | null)?.closest<HTMLElement>("[data-card]")?.dataset.card ?? null;
-      return { from, x, y, near, to: to === from ? null : to };
+      return { from, side, x, y, near, to: to === from ? null : to };
     };
     setDraft(at(e.clientX, e.clientY));
     const move = (ev: PointerEvent) => setDraft(at(ev.clientX, ev.clientY));
@@ -56,7 +61,9 @@ export default function Hub() {
       window.removeEventListener("pointerup", up);
       setDraft(null);
       const to = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-card]")?.dataset.card;
-      if (to && to !== from) projects.connect(from, to);
+      const card = projects.projects.find((p) => p.id === to);
+      // The line runs from the circle you pulled to the circle on the side of the card nearest where you let go.
+      if (to && card && to !== from) { const { x, y } = toCanvas(ev.clientX, ev.clientY); projects.connect(from, to, side, facing(card, x, y)); }
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -65,7 +72,9 @@ export default function Hub() {
   useEffect(() => {
     setView(stored(KEY, { x: 0, y: 0, z: 1 }));
     setPanel(stored("hub.panel", true));
+    setTab(stored("hub.tab", "dump"));
   }, []);
+  useEffect(() => store("hub.tab", tab), [tab]);
   useEffect(() => store(KEY, view), [view]);
   useEffect(() => store("hub.panel", panel), [panel]);
 
@@ -133,14 +142,22 @@ export default function Hub() {
           return { x: (r.width / 2 - view.x) / view.z - 130 + (n % 5) * 24, y: (r.height / 2 - view.y) / view.z - 60 + (n % 5) * 24 };
         }} />
       </div>
-      <button className="toggle" onClick={() => setPanel(!panel)} aria-label={panel ? "Hide inbox" : "Show inbox"}>
+      <button className="toggle" onClick={() => setPanel(!panel)} aria-label={panel ? `Hide ${names.inbox}` : `Show ${names.inbox}`}>
         <PanelIcon />
       </button>
       {panel && (
         <aside className="panel">
-          <h2 className="heading">{names.inbox}</h2>
-          <Categories inbox={inbox} selected={selected} onSelect={setSelected} chips />
-          <InboxList inbox={inbox} selected={selected} />
+          <div className="heading tabs" role="tablist">
+            <button role="tab" aria-selected={tab === "dump"} className={tab === "dump" ? "on" : ""} onClick={() => setTab("dump")}>{names.inbox}</button>
+            <button role="tab" aria-selected={tab === "tasks"} className={tab === "tasks" ? "on" : ""} onClick={() => setTab("tasks")}>Tasks</button>
+          </div>
+          {tab === "dump" ? (
+            <>
+              <Categories inbox={inbox} selected={selected} onSelect={setSelected} chips />
+              <InboxList inbox={inbox} selected={selected} />
+            </>
+          ) : <Agenda onOpen={setViewing} />}
+          {viewing && <ItemView id={viewing} inbox={inbox} onClose={() => setViewing(null)} />}
         </aside>
       )}
     </div>

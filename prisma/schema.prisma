@@ -41,6 +41,10 @@ model Item {
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   sortedBy   String    @default("pending") // "pending" | "rules" | "sure" | "ai" | "user"
   aiTries    Int       @default(0) // AI runs in a row that didn't produce a summary; retries stop at 3
+  dueDate    String? // "2026-10-26": with a date, time, or priority, it shows in the Tasks bar
+  dueTime    String? // "17:00"
+  priority   Int? // 1 high, 2 medium, 3 low
+  done       Boolean   @default(false) // checked off in the Tasks bar
   projectId  String? // optional link to a project; it stays in its category too
   project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   archived   Boolean   @default(false)
@@ -82,6 +86,8 @@ model ProjectLink {
   toId      String
   to        Project  @relation("to", fields: [toId], references: [id], onDelete: Cascade)
   color     String?
+  fromSide  String? // the circle the line was drawn from: "top" | "right" | "bottom" | "left"
+  toSide    String? // the side of the other card it was dropped nearest to
   createdAt DateTime @default(now())
 
   @@unique([fromId, toId])
@@ -92,7 +98,7 @@ model Section {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  type      String // "writing" | "tasks" | "sources" | "step" (Auto: explanation + subtasks); older: "notes", "items", "providers"
+  type      String // "writing" | "tasks" | "sources" (the project's Pantry) | "resources" (Auto: links from a web search, read-only, JSON in notes) | "assistant" (ask the AI, JSON in notes) | "step" (older Auto); older: "notes", "items", "providers"
   proposed  Boolean  @default(false) // made by the AI and not yet kept
   title     String
   order     Int      @default(0)
@@ -113,6 +119,9 @@ model Task {
   detail    String? // how to do it (steps in Auto projects)
   proposed  Boolean  @default(false) // suggested by the AI and not yet approved
   done      Boolean  @default(false)
+  dueDate   String? // "2026-10-26": with a date, time, or priority, it shows in the Tasks bar too
+  dueTime   String? // "17:00"
+  priority  Int? // 1 high, 2 medium, 3 low
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
@@ -140,6 +149,7 @@ model Scout {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   kind      String // "find" (options to compare) | "answer" (a write-up with citations) | "turn" (reshape pages into tasks, citations, a table)
   brief     String
+  taskId    String? // the task it was sent from: checked off when the Scout finishes
   status    String   @default("idle") // idle | searching | reading | thinking | done | failed
   note      String? // progress, or what went wrong
   result    String? // JSON, its shape depends on the kind

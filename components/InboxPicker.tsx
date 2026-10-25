@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { Item, useInbox } from "@/lib/useInbox";
 import { fromUrl } from "./Inbox";
+import { names } from "@/lib/names";
 
 export const itemName = (i: Item) => i.title ?? i.fileName ?? (i.url && fromUrl(i.url)) ?? i.url ?? i.text;
 
@@ -17,7 +18,7 @@ export default function InboxPicker({ inbox, exclude, onPick, up, inline }: {
   const groups = inbox.categories.map((c) => ({ c, items: choices.filter((i) => i.categoryId === c.id) })).filter((g) => g.items.length);
   return (
     <div className={`menu pick-items ${up ? "up" : ""} ${inline ? "inline" : ""}`}>
-      <input autoFocus value={q} placeholder="Search" aria-label="Search the inbox" onChange={(e) => setQ(e.target.value)} />
+      <input autoFocus value={q} placeholder="Search" aria-label={`Search the ${names.inbox}`} onChange={(e) => setQ(e.target.value)} />
       <div className="pick-cats">
         <button className={cat === null ? "on" : ""} onClick={() => setCat(null)}>All</button>
         {inbox.categories.filter((c) => c.count > 0).map((c) => (

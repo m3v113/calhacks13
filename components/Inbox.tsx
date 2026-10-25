@@ -1,7 +1,10 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Category, Item, useInbox } from "@/lib/useInbox";
-import { DocIcon, ImageIcon, LinkIcon, MoreIcon, NoteIcon, PlusIcon, TrashIcon } from "./Icons";
+import { CloseIcon, DocIcon, ImageIcon, LinkIcon, MoreIcon, NoteIcon, PlusIcon, ScoutIcon, TrashIcon } from "./Icons";
+import Mic from "./Mic";
+import { DueChip, DuePicker } from "./Due";
 import { COLORS } from "@/lib/colors";
 import ItemView from "./ItemView";
 
@@ -115,9 +118,13 @@ const ADD: { kind: "note" | "link" | "image" | "document"; label: string; Icon: 
   { kind: "document", label: "Document", Icon: DocIcon, accept: ".pdf,.txt,.md,.csv,.json,.doc,.docx,.rtf,.pages,application/pdf,text/*" },
 ];
 
-// The capture box (with the + menu) and the item list.
-export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string | null }) {
+// Words to look for in an item: its title, text, address, file name, and summary.
+export const matches = (i: Item, q: string) => !q || [i.title, i.text, i.url, i.fileName, i.summary].join(" ").toLowerCase().includes(q);
+
+// The capture box (with the + menu and the mic), a search box, and the item list. `exclude` hides items (e.g. ones already in a project).
+export function InboxList({ inbox, selected, exclude }: { inbox: Inbox; selected: string | null; exclude?: Set<string> }) {
   const [text, setText] = useState("");
+  const [q, setQ] = useState("");
   const [mode, setMode] = useState<"note" | "link">("note");
   const [adding, setAdding] = useState(false);
   const [dropping, setDropping] = useState(false);
@@ -126,7 +133,19 @@ export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string 
   const picker = useRef<HTMLInputElement>(null);
   const addMenu = useRef<HTMLDivElement>(null);
   const byId = new Map(inbox.categories.map((c) => [c.id, c]));
-  const items = selected ? inbox.items.filter((i) => i.categoryId === selected) : inbox.items;
+  const needle = q.trim().toLowerCase();
+  // Projects that match the search too (their name, writing, tasks, or Project Dump), found on the server.
+  const [found, setFound] = useState<{ id: string; title: string; color: string | null; hit: string | null }[]>([]);
+  useEffect(() => {
+    if (!needle) { setFound([]); return; }
+    let live = true;
+    const t = setTimeout(async () => {
+      const r = await fetch(`/api/search?q=${encodeURIComponent(needle)}`).catch(() => null);
+      if (live && r?.ok) setFound(await r.json());
+    }, 250);
+    return () => { live = false; clearTimeout(t); };
+  }, [needle]);
+  const items = inbox.items.filter((i) => (!selected || i.categoryId === selected) && !exclude?.has(i.id) && matches(i, needle));
 
   useEffect(() => {
     const el = box.current;
@@ -203,13 +222,35 @@ export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string 
             }
           }}
         />
+        {/* The words show up in the box as you speak. Started with an empty box, the note saves itself when you stop (hands-free). */}
+        <Mic value={text} onChange={setText} onDone={(said, fresh) => { if (fresh) { setText(""); if (said) inbox.add(said, "note"); } }} />
         <input ref={picker} type="file" multiple hidden onChange={(e) => { files(e.target.files); e.target.value = ""; }} />
       </div>
+      {inbox.items.length > 0 && (
+        <div className="find">
+          <ScoutIcon />
+          <input value={q} placeholder="Search" aria-label="Search" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQ("")} />
+          {q && <button className="icon small" aria-label="Clear search" onClick={() => setQ("")}><CloseIcon /></button>}
+        </div>
+      )}
+      {needle && found.length > 0 && (
+        <ul className="found">
+          {found.map((p) => (
+            <li key={p.id}>
+              <Link href={`/p/${p.id}`}>
+                <span className="dot square" style={{ background: p.color ?? "var(--muted)" }} />
+                <span className="found-body"><span className="found-title">{p.title}</span>{p.hit && <span className="found-hit">{p.hit}</span>}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
       <ul className="items">
         {items.map((i) => (
           <Row key={i.id} item={i} category={i.categoryId ? byId.get(i.categoryId) : undefined} inbox={inbox} showCat={!selected} onOpen={() => setViewing(i.id)} />
         ))}
       </ul>
+      {needle && !items.length && !found.length && <p className="muted find-none">Nothing found</p>}
       {viewing && <ItemView id={viewing} inbox={inbox} onClose={() => setViewing(null)} />}
     </div>
   );
@@ -243,6 +284,7 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
   const text = item.text.replace(/\n\s*\n/g, "\n");
   // Show the title once there is one, with the note, link, or file name underneath.
   const heading = item.title ?? (file ? item.fileName : null);
+  const due = { dueDate: item.dueDate ?? null, dueTime: item.dueTime ?? null, priority: item.priority ?? null };
   const showText = item.kind === "note" && item.sortedBy !== "sure" && (!heading || heading !== text);
 
   return (
@@ -262,13 +304,19 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
         {item.kind === "link" && !heading && <div className="text">{(item.url && fromUrl(item.url)) ?? item.url ?? text}</div>}
         {item.url && <div className="host">{host(item.url)}</div>}
         {item.kind === "document" && !pending && item.title !== item.fileName && <div className="host">{item.fileName}</div>}
+        <DueChip due={due} />
       </div>
       {item.kind === "image" && !item.id.startsWith("tmp-") && (
         <span className="thumb"><img src={`/api/files/${item.id}`} alt="" /></span>
       )}
-      {/* Right column: delete on top, the category under it, lined up from row to row. */}
+      {/* Right column: the date and delete on top, the category under it, lined up from row to row. */}
       <div className="aside">
-        {!pending && <button className="delete" onClick={() => inbox.remove(item.id)} aria-label="Delete" data-tip="Delete"><TrashIcon /></button>}
+        {!pending && (
+          <div className="aside-top">
+            <DuePicker icon due={due} onChange={(d) => inbox.setDue(item.id, d)} />
+            <button className="delete" onClick={() => inbox.remove(item.id)} aria-label="Delete" data-tip="Delete"><TrashIcon /></button>
+          </div>
+        )}
         {showCat && category && !pending && (
           <button className="cat" onClick={() => setOpen(!open)}>{category.name}</button>
         )}

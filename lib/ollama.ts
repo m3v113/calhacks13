@@ -56,7 +56,19 @@ export function markBroken(name: string) {
   broken.add(name);
 }
 
-type Opts = { model?: string; images?: string[]; timeoutMs?: number };
+// Keep the model in memory between calls, so only the first one waits for it to load.
+const KEEP = "30m";
+let warmed = 0;
+
+// Load the model ahead of time (it can take several seconds), at most every few minutes.
+export function warm() {
+  if (Date.now() - warmed < 5 * 60_000) return;
+  warmed = Date.now();
+  fetch(`${URL}/api/generate`, { method: "POST", body: JSON.stringify({ model: MODEL, keep_alive: KEEP }), signal: AbortSignal.timeout(60000) }).catch(() => {});
+}
+
+// maxTokens stops a long answer early, which is most of the wait with a small local model.
+type Opts = { model?: string; images?: string[]; timeoutMs?: number; maxTokens?: number };
 
 // One chat call that must return JSON matching `schema`. Retries once on bad JSON.
 export async function chatJSON<T>(system: string, user: string, schema: object, check: (v: unknown) => v is T, opts: Opts = {}): Promise<T> {
@@ -70,7 +82,7 @@ export async function chatJSON<T>(system: string, user: string, schema: object, 
     const r = await fetch(`${URL}/api/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: opts.model ?? MODEL, messages, format: schema, stream: false, options: { temperature: 0 } }),
+      body: JSON.stringify({ model: opts.model ?? MODEL, messages, format: schema, stream: false, keep_alive: KEEP, options: { temperature: 0, ...(opts.maxTokens ? { num_predict: opts.maxTokens } : {}) } }),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 60000),
     });
     if (!r.ok) throw new Error(`ollama ${r.status}: ${(await r.text()).slice(0, 300)}`);
@@ -92,7 +104,7 @@ export async function chatText(model: string, prompt: string, images?: string[])
   const r = await fetch(`${URL}/api/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt, ...(images ? { images } : {}) }], stream: false, options: { temperature: 0 } }),
+    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt, ...(images ? { images } : {}) }], stream: false, keep_alive: KEEP, options: { temperature: 0 } }),
     signal: AbortSignal.timeout(240000),
   });
   if (!r.ok) throw new Error(`ollama ${model} ${r.status}: ${(await r.text()).slice(0, 300)}`);

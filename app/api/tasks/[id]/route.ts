@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { dueFields } from "@/lib/due";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-// Check off, reword, or approve a task ({ proposed: false } keeps one the AI suggested).
+// Check off, reword, or approve a task ({ proposed: false } keeps one the AI suggested), or set its date, time, and priority.
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
@@ -12,6 +13,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (body.proposed === false) data.proposed = false;
   if (typeof body.detail === "string") data.detail = body.detail.trim().slice(0, 600) || null;
   if (typeof body.text === "string" && body.text.trim()) data.text = body.text.trim().slice(0, 500);
+  Object.assign(data, dueFields(body));
   try {
     return NextResponse.json(await db.task.update({ where: { id }, data }));
   } catch {

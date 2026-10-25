@@ -13,6 +13,15 @@ export async function ensureSeed() {
   if (seeded) return;
   if ((await db.category.count()) === 0) {
     await db.category.createMany({ data: STARTERS.map((c) => ({ ...c, auto: false })) });
+  } else {
+    // Wordle used to be a starter category. An empty one is swapped for the new starters (a Wordle share still makes its own).
+    const wordle = await db.category.findFirst({ where: { name: "Wordle", auto: false, items: { none: {} } } });
+    if (wordle) {
+      await db.category.delete({ where: { id: wordle.id } });
+      const have = new Set((await db.category.findMany({ select: { name: true } })).map((c) => c.name.toLowerCase()));
+      const add = STARTERS.filter((c) => !have.has(c.name.toLowerCase()));
+      if (add.length) await db.category.createMany({ data: add.map((c) => ({ ...c, auto: false })) });
+    }
   }
   seeded = true;
 }

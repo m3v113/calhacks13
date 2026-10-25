@@ -137,7 +137,7 @@ async function paper(url: string) {
     ? `https://api.crossref.org/works/${encodeURIComponent(doi)}`
     : `https://api.crossref.org/works?rows=1&filter=alternative-id:${pii}`;
   try {
-    const r = await fetch(api, { headers: { "user-agent": "ProjectScaffold/0.1" }, signal: AbortSignal.timeout(6000) });
+    const r = await fetch(api, { headers: { "user-agent": "Oven/0.1" }, signal: AbortSignal.timeout(6000) });
     if (!r.ok) return null;
     const m = (await r.json()).message;
     const work = doi ? m : m?.items?.[0];

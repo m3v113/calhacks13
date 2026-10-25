@@ -1,6 +1,6 @@
 # Journal
 
-The running log for Project Scaffold: what's done, what's next, and why. Newest entries go at the top of **Log**. The plan (`Project_Scaffold_Plan.md`) says what we're building; this file says what actually happened.
+The running log for Oven: what's done, what's next, and why. Newest entries go at the top of **Log**. The plan (`Project_Scaffold_Plan.md`) says what we're building; this file says what actually happened.
 
 > **Read-only for contributors.** Read this for context on how the app works and why. Please don't edit it in your PRs: Mehvish's Claude updates it when each PR is merged. (The plan itself isn't in the repo.)
 
@@ -8,8 +8,8 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** Projects round 2a (PR #8) and Scouts 2b (PR #9, built on PR #8), both in review. Next is 2c: researched Auto layouts (an Answer Scout feeding the planner).
-**Done:** F1 Smart Inbox, now called Brain Dump (PR #5, renamed in PR #7), F3 + F4 first version (PR #6, merged).
+**Working on:** rounds 4 to 8 (PR #10): Resources, AI section, Project Dumps, search, the live Cartesia mic, and the Tasks page. Next: a voice feature for the Cartesia track, once Mehvish picks one (`plans/cartesia-voice.md`).
+**Done:** F1 Smart Inbox, now called Pantry (PR #5, renamed Brain Dump in PR #7, Pantry in round 8), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
 
@@ -36,7 +36,8 @@ Ordered. Feature numbers match the plan.
 - [ ] Check Bright Data on the Mac: paste the allrecipes link, look for `[link] read … with Bright Data` (F1)
 - [ ] Service Scout with Bright Data SERP API + Web Unlocker (F5, Bright Data prize)
 - [ ] Try PR #8 on the Mac with gemma3:4b: make a Space and an Auto project and check the sections and proposed steps
-- [ ] Try Scouts (PR #9) with `BRIGHTDATA_SERP_ZONE="serp_api1"` in `.env`
+- [ ] Try a Find Scout again with PR #10. If it still fails, copy the `[scout] search gave back` line from the Terminal
+- [ ] Add `CARTESIA_API_KEY` to `.env` and try the mic
 - [ ] Decide on Factory Droid SDK or Fetch.ai for the Scouts (F5)
 - [ ] Status dot shows offline too, not just AI on or off (F6)
 - [ ] Seed script for the demo
@@ -56,11 +57,69 @@ Ordered. Feature numbers match the plan.
 - [x] Side trays, New category and drag-to-tag in the sidebar (2026-10-24, PR #4, merged)
 - [x] Edit and delete categories, change category in a tray, AI learns from moves, Bright Data backup for blocked links, inbox final pass (2026-10-24, PR #5, merged)
 - [x] F3 + F4: project cards on the Hub, new project from one sentence, project space with tasks, notes, linked items, and summary, plus a project chip in the tray (2026-10-24, PR #6, merged)
-- [x] Projects round 2a: Auto vs Space, Writing/Tasks/Sources sections in a grid, formatting, Sources that add to the inbox, bigger cards, links between projects (2026-10-24, PR #8)
+- [x] Projects round 2a: Auto vs Space, Writing/Tasks/Sources sections in a grid, formatting, Sources that add to the inbox, bigger cards, links between projects (2026-10-24, PR #8, merged)
+- [x] Scouts (Find, Answer, Turn into) with Bright Data SERP, Resources in Auto projects (2026-10-24, PR #9, merged)
 
 ---
 
 ## Log
+
+### 2026-10-25 · Round 8: the app is Oven, the Brain Dump is the Pantry (PR #10)
+
+- Mehvish renamed the app to **Oven** and the Brain Dump to **Pantry**. Both names live in `lib/names.ts`, so the UI, page titles, and tooltips follow. The package is `oven`, and the README, `CLAUDE.md`, `.env.example`, and code comments use the new names. Entries below this one keep the names used at the time.
+- A project's own section stays **Project Dump**. Old project sections still titled "Brain Dump" or "Sources" are renamed to Project Dump on load.
+- The GitHub repo (`m3v113/calhacks13`) and the Mac folder (`project_manager`) keep their names.
+
+### 2026-10-25 · Round 7: date fixes, project search, read-only Overview (PR #10)
+
+- **Dates said "No date" after picking one:** each change in the date menu was saved on its own, and the list reloaded after each save. A reload that came back late could replace newer choices, so the menu showed a date that the list didn't have. Now the menu keeps its own copy while it's open, every change sends date, time, and priority together, and only the newest reload counts (in the Tasks list and the Brain Dump). Typed dates and times are also read again when you leave the field. Safari-style date fields (Mehvish's browser) couldn't be tested here, only Chromium.
+- **Calendar button** on Brain Dump rows is now to the left of the trash can, shown on hover. The date itself stays under the title.
+- **AI answers** scroll inside their box (at most 420 px tall), so a long answer doesn't take over the page.
+- **Overview is read-only:** a new `overview` section type, shown as formatted text without the editor. Existing Auto-project Overviews are converted on load. The AI section still reads it.
+- **Search finds projects:** `GET /api/search?q=` looks at each project's name, goal, context, section titles, writing, tasks, and Project Dump items, and returns up to 8 with the words that matched. They show above the Brain Dump results.
+
+### 2026-10-25 · Round 6: live mic, Project Dump, Tasks page, speed (PR #10)
+
+Mehvish tried round 5 on her Mac. Added to the same PR.
+
+- **Words didn't appear while speaking:** the mic now streams to Cartesia's live speech to text (`wss://api.cartesia.ai/stt/turns/websocket`, model `ink-2`, raw 16-bit audio at 16 kHz). Cartesia sends each turn's words as they're heard (`turn.update`) and the final text when you pause (`turn.end`). The browser gets a 10-minute token that can only transcribe (`POST /api/transcribe/token`, which calls Cartesia's `/access-token`), so the key stays on the server. If the live connection can't open, the old 3-second pieces are the fallback. Tested with a mocked WebSocket, not yet against Cartesia itself.
+- **The Brain Dump side panel on project pages is gone.** Each project's own section is now the **Project Dump** (old "Brain Dump" and "Sources" titles are renamed on load). **From Brain Dump** moves items in from the Brain Dump, × sends one back. Scouts, Resources, and the AI section all say Project Dump.
+- **Tasks has its own page** (`/tasks`), behind a calendar icon in the sidebar next to the Brain Dump icon, which is where Mehvish looked for it. It has an **Add a task** box (a Brain Dump item due today unless you pick a date) and each date can be changed in place. The Hub panel's Tasks tab stays. Brain Dump rows get a calendar button on hover, so you don't have to open the tray.
+- **Faster:** Ollama now keeps the model loaded for 30 minutes (`keep_alive`), and the app loads it as soon as a page is open, so the first answer doesn't wait for it to load. Plans ask for 3 or 4 parts with a token cap, the wait for a project's links to be read is 8 seconds at most (was 30), and with web search the Resources section shows right away while the AI writes the rest. A smaller model (`gemma3:1b`) is faster still but sorts less well; left as a choice in the README.
+
+### 2026-10-25 · Round 5: project Brain Dumps, Tasks tab, fixes (PR #10)
+
+Mehvish tried round 4 on her Mac. Added to the same PR.
+
+- **Add as tasks made an empty section:** gemma wrote the list inside the reply ("1. … 2. …") and left items empty. The server now splits such a reply into items, and the page does the same for answers saved before. "Due: 2026-10-30" at the end of a task becomes its date.
+- **Starting categories:** Recipes, Events, School, Home, Other (Wordle was too niche). An empty Wordle starter is swapped on the next load, and a Wordle share still makes its own. The sorting prompt now says to pick an existing category only when the item really is that kind of thing (homework had gone to Recipes). There's a School keyword rule for when the AI is off.
+- **Gaps in the layout:** halves between full-width sections now go into two columns that stack on their own, alternating, instead of rows. A short half no longer leaves a hole under it.
+- **Each project's Brain Dump is its own:** the main Brain Dump (`GET /api/items`) lists only items with no project, so it's the place for things still to be sorted. Adding to a project, dragging onto a card, saving from a Scout, or moving from Resources all put the item only in the project. × or dragging back to the panel moves it back.
+- **Resources:** each page has + (move to the project's Brain Dump, with its title and summary, so the page isn't read or summarized again; only the category is picked) and ×. Removed pages are remembered, so More doesn't bring them back. More now runs a slightly different search each time ("… tutorial", "… tips", …) before later pages. The second page of the same search had drifted to unrelated "SOLVE" sites for a Rubik's Cube project. Pages that don't mention two of the project's main words are left out.
+- **Find tags:** "Price: Price: Under $10" loses the repeated label, and "N/A" values and options named "N/A" are dropped.
+- **New project box:** the Brain Dump row is dashed with a lock and a line on what it is. A line under + Writing, + Tasks, and + AI says what each one is. + AI is new there.
+- **Mic shows text while you speak:** it records in 3-second pieces, each its own recording, and each is transcribed with the same Cartesia call as it comes in. The total audio sent is the same. A word at a break can be split. Cartesia's streaming WebSocket would avoid that, but it needs a key or token in the browser, so it was left for later.
+- **Lines from the circle you drew from:** `ProjectLink.fromSide` and `toSide` are new fields. The other end is the side of the target card nearest where you let go. Old lines use the sides that face each other.
+- **Tasks tab (new):** Brain Dump items and project tasks can have a date, time, and priority (`dueDate` "YYYY-MM-DD", `dueTime` "HH:MM", `priority` 1–3, plus `Item.done`). `GET /api/agenda` lists everything that has one and isn't done, soonest first. On the Hub, the side panel has Brain Dump and Tasks tabs. The calendar icon on a task, or in an item's tray, sets them.
+- **New fields:** `Item.dueDate/dueTime/priority/done`, `Task.dueDate/dueTime/priority`, `ProjectLink.fromSide/toSide`. `prisma db push` adds them without touching data.
+
+### 2026-10-25 · Round 4: Resources, AI section, project Brain Dump, mic (PR #10)
+
+Mehvish's round 4 feedback, after trying PR #9 with real search.
+
+- **"The answer wasn't JSON" (Find failed after a long wait):** the cause on her Mac is still unknown, so the search now handles every shape Bright Data can send. Google's page (HTML) is read for its result links. Anything else, like a plain-text error or an empty answer, gets one more try asking for Bright Data's wrapped JSON (`format: "json"`, results in `body`). If that fails too, the message shows the start of what Bright Data sent.
+- **Resources is read-only:** a new section type, `resources`. It's stored as JSON (the search words, how far into the results it is, and the pages), and shown like Scout results. The whole row is the link. The refresh icon fetches the next page of the same search (`&start=10`, one paid search per press), or more AI-suggested sites without search. It can't be deleted. Old Resources Writing sections are converted on the first page load.
+- **Auto projects are one Overview:** one full-width Writing section with a heading per part, one To do from the checklists, and Resources, instead of 4–6 sections. Mehvish found it too much text. Tasks stay a separate section so they can be checked off and sent to Scouts.
+- **AI section (`assistant`):** added with + Section → AI. It answers requests about what's in the project, on the local AI: make tasks, rewrite formally, feedback, citations. It reads the writing, tasks, Brain Dump (with page text), and links pasted in the request. Answers are kept in the section (last 10). Add as tasks / Add to project make sections.
+- **Turn into moved to the AI section** (Mehvish's choice on a decision card). Scouts are just Find and Answer, the ones that use the web. Old Turn into Scouts still show and can be re-run.
+- **Task checked off:** a Scout sent from a task stores `taskId` and checks the task when it finishes. The page reloads when Scouts stop running.
+- **Citations:** one per paragraph with a hanging indent, *italic* where the AI marks it, and links. Same in Writing when added.
+- **Scout explanations:** two sentences each, with examples.
+- **Layout without gaps:** sections are laid out in rows of two halves or one full width. A half with no half next to it fills its row. Dropping one beside another keeps them in the same row (the half before them goes full width if it would pair instead).
+- **Project Brain Dump:** grouped by category like the main one. A panel icon on the project page shows the main Brain Dump on the right. Drag from it into the project's Brain Dump to add, and drag back out to remove.
+- **Brain Dump search:** under the capture box, in titles, notes, links, file names, and summaries.
+- **Mic (Cartesia Ink-Whisper):** records in the browser, `/api/transcribe` sends it to Cartesia's `/stt` with `CARTESIA_API_KEY`. With an empty box, the note is saved right away (for phone or driving).
+- **New field:** `Scout.taskId`. `prisma db push` adds it without touching data.
 
 ### 2026-10-24 · Scouts (PR #9)
 

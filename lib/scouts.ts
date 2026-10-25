@@ -22,23 +22,46 @@ export const searchReady = () => !!(process.env.BRIGHTDATA_API_KEY && process.en
 export type Hit = { title: string; link: string; description: string };
 
 // One Google search through the Bright Data SERP API, as light JSON (title, link, description).
-export async function search(query: string): Promise<Hit[] | string> {
-  const cached = await db.searchCache.findUnique({ where: { query } });
+// `start` skips that many results, for the next page of the same search.
+export async function search(query: string, start = 0): Promise<Hit[] | string> {
+  const key = start ? `${query}#${start}` : query;
+  const cached = await db.searchCache.findUnique({ where: { query: key } });
   if (cached && Date.now() - cached.fetchedAt.getTime() < SEARCH_DAYS * 86400_000) return JSON.parse(cached.results);
   // Bright Data is sometimes slow: a search that times out or hits a server error is tried once more.
-  const first = await searchOnce(query);
-  return typeof first === "string" && /too long|HTTP 5/.test(first) ? searchOnce(query) : first;
+  // When the answer isn't JSON, the second try asks for Bright Data's wrapped JSON instead.
+  const first = await searchOnce(query, start, "light");
+  const hits = typeof first === "string" && /too long|HTTP 5|wasn't JSON|empty/.test(first) ? await searchOnce(query, start, "wrapped") : first;
+  if (Array.isArray(hits) && hits.length) {
+    await db.searchCache.upsert({ where: { query: key }, create: { query: key, results: JSON.stringify(hits) }, update: { results: JSON.stringify(hits), fetchedAt: new Date() } });
+  }
+  return hits;
 }
 
-async function searchOnce(query: string): Promise<Hit[] | string> {
+// When Bright Data sends Google's page instead of JSON, pull the results out of the page itself:
+// each result is a link around an <h3> title.
+function fromHtml(html: string): Hit[] {
+  const hits: Hit[] = [];
+  const strip = (t: string) => t.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
+  for (const m of html.matchAll(/<a[^>]+href="([^"]+)"[^>]*>((?:(?!<\/a>)[\s\S]){0,2000}?)<h3[^>]*>([\s\S]*?)<\/h3>/g)) {
+    let link = m[1].replace(/&amp;/g, "&");
+    if (link.startsWith("/url?")) link = new URLSearchParams(link.slice(5)).get("q") ?? "";
+    const title = strip(m[3]);
+    if (!/^https?:\/\//.test(link) || /(^|\.)google\./.test(new URL(link).hostname) || !title || hits.some((h) => h.link === link)) continue;
+    hits.push({ title, link, description: "" });
+  }
+  return hits.slice(0, 10);
+}
+
+async function searchOnce(query: string, start: number, style: "light" | "wrapped"): Promise<Hit[] | string> {
   try {
     const r = await fetch("https://api.brightdata.com/request", {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.BRIGHTDATA_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({
-        zone: process.env.BRIGHTDATA_SERP_ZONE, format: "raw", data_format: "parsed_light",
+        zone: process.env.BRIGHTDATA_SERP_ZONE,
+        ...(style === "light" ? { format: "raw", data_format: "parsed_light" } : { format: "json" }),
         // brd_json asks for parsed JSON too, in case the zone ignores data_format.
-        url: `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en&gl=us&brd_json=1`,
+        url: `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en&gl=us${start ? `&start=${start}` : ""}&brd_json=1`,
       }),
       signal: AbortSignal.timeout(60000),
     });
@@ -47,20 +70,34 @@ async function searchOnce(query: string): Promise<Hit[] | string> {
       console.warn(`[scout] search failed: HTTP ${r.status} ${r.headers.get("x-brd-error") ?? ""} ${body.slice(0, 300)}`);
       return `HTTP ${r.status}${r.status === 401 ? ", the API key was refused" : r.status === 403 || r.status === 400 ? `, ${(r.headers.get("x-brd-error") ?? body).slice(0, 120)}` : ""}`;
     }
-    let j;
-    try { j = JSON.parse(body); } catch {
-      console.warn(`[scout] search gave back something that isn't JSON: ${body.slice(0, 300)}`);
-      return "the answer wasn't JSON";
+    if (!body.trim()) {
+      console.warn(`[scout] search gave back nothing: ${r.headers.get("x-brd-error") ?? ""}`);
+      return `the answer was empty${r.headers.get("x-brd-error") ? `: ${r.headers.get("x-brd-error")!.slice(0, 100)}` : ""}`;
     }
-    // Some Bright Data replies wrap the results: { status_code, body: "<json>" }.
-    if (typeof j?.body === "string") { try { j = JSON.parse(j.body); } catch {} }
-    const organic: Record<string, unknown>[] = j?.organic ?? j?.results ?? [];
-    const hits = organic.map((o) => ({
-      title: String(o.title ?? ""), link: String(o.link ?? o.url ?? ""), description: String(o.description ?? o.snippet ?? ""),
-    })).filter((h) => /^https?:\/\//.test(h.link) && h.title).slice(0, 10);
+    let j;
+    let hits: Hit[];
+    try {
+      j = JSON.parse(body);
+      // Some Bright Data replies wrap the results: { status_code, body: "<json>" }.
+      if (typeof j?.body === "string") {
+        const inner = j.body as string;
+        try { j = JSON.parse(inner); } catch { j = { organic: fromHtml(inner) }; }
+      }
+      const organic: Record<string, unknown>[] = j?.organic ?? j?.results ?? [];
+      hits = organic.map((o) => ({
+        title: String(o.title ?? ""), link: String(o.link ?? o.url ?? ""), description: String(o.description ?? o.snippet ?? ""),
+      })).filter((h) => /^https?:\/\//.test(h.link) && h.title).slice(0, 10);
+    } catch {
+      hits = /<html|<div/i.test(body) ? fromHtml(body) : [];
+      if (!hits.length) {
+        console.warn(`[scout] search gave back something that isn't JSON: ${body.slice(0, 300)}`);
+        // The start of the answer usually says what went wrong (a Bright Data error message).
+        return `the answer wasn't JSON: "${body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 80)}"`;
+      }
+      console.log(`[scout] search gave back Google's page; read ${hits.length} results from it`);
+    }
     console.log(`[scout] searched "${query}" with Bright Data: ${hits.length} results`);
-    if (!hits.length) { console.warn(`[scout] no results in: ${body.slice(0, 300)}`); return hits; }
-    await db.searchCache.upsert({ where: { query }, create: { query, results: JSON.stringify(hits) }, update: { results: JSON.stringify(hits), fetchedAt: new Date() } });
+    if (!hits.length) console.warn(`[scout] no results in: ${body.slice(0, 300)}`);
     return hits;
   } catch (e) {
     console.warn("[scout] search failed:", (e as Error).message);
@@ -155,7 +192,7 @@ async function runScout(id: string) {
     let result: ScoutResult;
 
     if (s.kind === "turn") {
-      await status("reading", `Reading your ${names.inbox}`);
+      await status("reading", `Reading your ${names.projectDump}`);
       const links = [...new Set(s.brief.match(/https?:\/\/[^\s<>"']+/g) ?? [])].slice(0, MAX_PAGES);
       const pages: Page[] = [];
       const parts: string[] = [];
@@ -172,7 +209,7 @@ async function runScout(id: string) {
         pages.push({ n: pages.length + 1, title: name, link: i.url ?? "" });
         parts.push(`[${pages.length}] ${name}${i.url ? ` (${i.url})` : ""}\n${[page?.summary, i.overview].filter(Boolean).join(" ")}\n${clip(page?.text || i.extracted || i.text, 1500)}`);
       }
-      if (!parts.length) { await status("failed", `Nothing to read. Add things to the ${names.inbox}, or paste links in the brief.`); return; }
+      if (!parts.length) { await status("failed", `Nothing to read. Add things to the ${names.projectDump}, or paste links in the brief.`); return; }
       await status("thinking", "Putting it together");
       const a = await chatJSON(TURN_SYSTEM, `Request: ${s.brief}\n\nPages and notes:\n${parts.join("\n\n").slice(0, 14000)}`, {
         type: "object",
@@ -227,9 +264,14 @@ async function runScout(id: string) {
           }, { timeoutMs: 240_000 });
           // A value has to look like one: short, and with a number for fields that are numbers (price, size...).
           const numeric = (f: string) => /price|cost|size|rating|weight|year|dimension|speed|volume|capacity|distance|length|width|height|stars?/i.test(f);
-          const fit = (f: string, v: string) => (v.length <= 30 && (!numeric(f) || /\d/.test(v)) ? v : "");
+          // The model sometimes repeats the field ("Price: Under $10") or writes "N/A" for a missing value.
+          const empty = /^(n\/?a|none|unknown|not (given|listed|stated|specified)|-+|\?)$/i;
+          const fit = (f: string, raw: string) => {
+            const v = raw.replace(new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*`, "i"), "").trim();
+            return v.length <= 30 && !empty.test(v) && (!numeric(f) || /\d/.test(v)) ? v : "";
+          };
           const allFields = a.fields.map((f) => clip(f, 24)).filter(Boolean).slice(0, 4);
-          let options = a.options.filter((o) => pages[o.page - 1] && clip(o.name, 120)).slice(0, 6).map((o) => ({
+          let options = a.options.filter((o) => pages[o.page - 1] && clip(o.name, 120) && !empty.test(clip(o.name, 120))).slice(0, 6).map((o) => ({
             name: clip(o.name, 120), link: pages[o.page - 1].link, values: allFields.map((f, i) => fit(f, clip(o.values[i] ?? "", 60))), why: clip(o.why, 300),
           }));
           // Fields that no option has a value for are dropped.
@@ -247,6 +289,7 @@ async function runScout(id: string) {
       }
     }
     await db.scout.update({ where: { id }, data: { status: "done", note: null, result: JSON.stringify(result) } });
+    if (s.taskId) await db.task.updateMany({ where: { id: s.taskId }, data: { done: true } });
   } catch (e) {
     console.warn("[scout] run failed:", (e as Error).message);
     await status("failed", "Something went wrong. Run it again.").catch(() => {});
@@ -265,7 +308,7 @@ const isPoints = (v: unknown): v is { points: { text: string; sources: number[] 
   (v as { points: { text: unknown; sources: unknown }[] }).points.every((p) => typeof p?.text === "string" && Array.isArray(p?.sources) && p.sources.every((n) => typeof n === "number"));
 
 // A Scout as the page sees it.
-export const view = (s: { id: string; kind: string; brief: string; status: string; note: string | null; result: string | null; updatedAt: Date }) => ({
-  id: s.id, kind: s.kind, brief: s.brief, status: s.status, note: s.note, updatedAt: s.updatedAt,
+export const view = (s: { id: string; kind: string; brief: string; status: string; note: string | null; result: string | null; taskId: string | null; updatedAt: Date }) => ({
+  id: s.id, kind: s.kind, brief: s.brief, status: s.status, note: s.note, taskId: s.taskId, updatedAt: s.updatedAt,
   result: s.result ? (JSON.parse(s.result) as ScoutResult) : null,
 });

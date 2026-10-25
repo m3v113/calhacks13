@@ -13,6 +13,9 @@ export type Item = {
   title: string | null;
   categoryId: string | null;
   projectId?: string | null;
+  dueDate?: string | null;
+  dueTime?: string | null;
+  priority?: number | null;
   sortedBy: string;
   createdAt: string;
 };
@@ -25,11 +28,15 @@ export function useInbox() {
   const [vision, setVision] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Only the newest load counts, so an answer that comes back late can't undo a change made since.
+  const seq = useRef(0);
   const load = useCallback(async () => {
     clearTimeout(timer.current);
+    const n = ++seq.current;
     try {
       const r = await fetch("/api/items", { cache: "no-store" });
       const data = await r.json();
+      if (n !== seq.current) return;
       setCategories(data.categories);
       setItems(data.items);
       // Poll quickly while something is still sorting, slowly otherwise.
@@ -90,6 +97,12 @@ export function useInbox() {
     return patch(id, { categoryId });
   }, [patch]);
 
+  const setDue = useCallback((id: string, due: { dueDate?: string | null; dueTime?: string | null; priority?: number | null }) => {
+    seq.current++;
+    setItems((xs) => xs.map((i) => (i.id === id ? { ...i, ...due } : i)));
+    return patch(id, due);
+  }, [patch]);
+
   const newCategory = useCallback((id: string, categoryName: string) => patch(id, { categoryName }), [patch]);
 
   // Rename or recolor a category. Returns false when the name is already taken.
@@ -124,5 +137,5 @@ export function useInbox() {
     load();
   }, [load]);
 
-  return { categories, items, ai, vision, add, upload, setCategory, newCategory, createCategory, editCategory, deleteCategory, archive, remove, refresh: load };
+  return { categories, items, ai, vision, add, upload, setCategory, setDue, newCategory, createCategory, editCategory, deleteCategory, archive, remove, refresh: load };
 }

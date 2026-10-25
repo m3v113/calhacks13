@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Category, useInbox } from "@/lib/useInbox";
 import { CloseIcon, OpenIcon, RefreshIcon, TrashIcon } from "./Icons";
 import { Menu, fromUrl } from "./Inbox";
+import { DuePicker } from "./Due";
 
 type Inbox = ReturnType<typeof useInbox>;
 type Full = {
@@ -10,6 +11,7 @@ type Full = {
   fileName: string | null; mime: string | null; extracted: string | null; category: Category | null;
   overview: string | null; overviewBy: string | null; notes: string | null; sortedBy: string;
   aiTries: number; image: string | null; project: { id: string; title: string; color: string | null } | null;
+  dueDate: string | null; dueTime: string | null; priority: number | null;
 };
 type ProjectChoice = { id: string; title: string; color: string | null };
 
@@ -152,6 +154,7 @@ export default function ItemView({ id, inbox, onClose }: { id: string; inbox: In
           {item && (
             <ProjectPick item={item} onPicked={(project) => { setItem({ ...item, project }); save({ projectId: project?.id ?? null }); }} />
           )}
+          {item && <DuePicker due={item} onChange={(d) => { setItem({ ...item, ...d }); save(d); }} />}
           <span className="grow" />
           {item && (
             <button className="icon" data-tip="Delete" aria-label="Delete" onClick={() => { inbox.remove(item.id); onClose(); }}><TrashIcon /></button>

@@ -379,9 +379,10 @@ span.np-type { padding: 6px 8px; }
 .space-cols { display: grid; grid-template-columns: minmax(240px, 1.3fr) minmax(0, 4fr); gap: 16px; max-width: 1280px; margin: 0 auto; align-items: start; }
 .scouts { position: sticky; top: 16px; min-height: 200px; max-height: calc(100vh - 32px); overflow-y: auto; }
 .space .muted, .section .muted { color: var(--muted); font-size: 14px; margin: 4px 0; }
-.sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; align-items: start; }
+.sections { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.band { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.band-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .section { position: relative; background: var(--surface); border-radius: var(--radius); padding: 8px 14px 12px; min-width: 0; transition: box-shadow .15s; }
-.section.wide { grid-column: span 2; }
 .section.lifted { z-index: 10; opacity: .85; box-shadow: 0 12px 32px rgba(0,0,0,.18); transition: none; pointer-events: none; }
 .section::after { content: ""; position: absolute; background: var(--ink); border-radius: 2px; opacity: 0; pointer-events: none; }
 .section.drop-left::after { opacity: 1; left: -8px; top: 0; bottom: 0; width: 4px; }
@@ -405,8 +406,7 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 @media (max-width: 860px) {
   .space-cols { grid-template-columns: 1fr; }
   .scouts { position: static; min-height: 0; order: 1; }
-  .sections { grid-template-columns: 1fr; }
-  .section.wide { grid-column: auto; }
+  .band { grid-template-columns: 1fr; }
   .add-section { padding-left: 0; }
   .add-section .menu { left: 0; }
 }
@@ -528,3 +528,130 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
   .item .aside { width: 76px; }
 }
 .pick-items.up { top: auto; bottom: calc(100% + 4px); }
+
+/* Mic */
+.mic { position: relative; display: inline-flex; flex: none; }
+.mic .icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+.mic .icon.small { width: 28px; height: 28px; }
+.mic .icon:hover { background: var(--hover); color: var(--ink); }
+.mic .icon svg { width: 16px; height: 16px; }
+.mic .icon.recording { background: #E0607E; color: #fff; }
+.mic .icon.working { animation: pulse 1.2s ease-in-out infinite; }
+.mic-note { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; width: max-content; max-width: 240px; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.capture .mic .icon { width: 36px; height: 36px; }
+
+/* Pantry search */
+.find { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; padding: 0 4px 0 10px; border-radius: 10px; color: var(--muted); }
+.find:focus-within, .find:hover { background: var(--hover); }
+.find > svg { width: 15px; height: 15px; flex: none; }
+.find input { flex: 1; min-width: 0; border: 0 !important; outline: none; background: none !important; padding: 7px 0 !important; color: var(--ink); }
+.find .icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+.find .icon svg { width: 14px; height: 14px; }
+.find-none { font-size: 14px; color: var(--muted); margin: 12px 4px; }
+
+/* The Project Dump */
+.brain-group + .brain-group { margin-top: 4px; }
+.brain .pick-head { padding: 6px 0 2px; }
+
+/* Resources */
+.resources { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.resources a { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; margin: 0 -10px; border-radius: 10px; }
+.resources a:hover { background: var(--hover); }
+.res-title { font-weight: 550; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.resources a:hover .res-title { text-decoration-color: currentColor; }
+.res-about { font-size: 14px; color: var(--muted); }
+.res-host { font-size: 12px; color: var(--muted); opacity: .75; }
+
+/* AI section */
+.assistant { display: flex; flex-direction: column; gap: 8px; }
+.ask-box { display: flex; align-items: flex-start; gap: 6px; color: var(--muted); }
+.ask-box > svg { width: 16px; height: 16px; flex: none; margin-top: 8px; }
+.space .ask-box textarea { margin: 0; width: auto; flex: 1; }
+.ask { background: var(--bg); border-radius: 10px; padding: 6px 10px 8px; }
+.ask-q { display: flex; align-items: flex-start; gap: 4px; }
+.ask-q .name { flex: 1; min-width: 0; text-align: left; font-size: 14px; font-weight: 500; padding: 4px 0; overflow-wrap: anywhere; }
+.ask:hover .fade { opacity: 1; }
+.ask-a { display: flex; flex-direction: column; gap: 6px; font-size: 14px; padding-top: 2px; }
+.ask-a p { margin: 0; }
+.ask-a ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.ask-a a, .citations a { text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.ask .scout-add { background: var(--surface); }
+/* Citations: one per paragraph, with a hanging indent like a reference list. */
+.citations p { margin: 0 0 6px; padding-left: 24px; text-indent: -24px; overflow-wrap: anywhere; }
+.add-source { flex-wrap: wrap; }
+.add-source > input { min-width: 140px; }
+.resources li { position: relative; }
+.resources a { padding-right: 64px; }
+.res-actions { position: absolute; top: 6px; right: -6px; display: flex; opacity: 0; transition: opacity .12s; }
+.resources li:hover .res-actions, .res-actions:focus-within { opacity: 1; }
+.res-actions .icon[data-tip]:hover::after { left: auto; right: 0; transform: none; }
+/* The project's own Pantry in the New project box: always there, so it looks apart from the sections. */
+.np-sections li.np-dump { margin-top: 4px; padding: 7px 8px; border: 1px dashed var(--line); border-radius: 10px; gap: 8px; flex-wrap: wrap; }
+.np-dump .np-lock { width: auto; height: auto; opacity: 1; }
+.np-dump-name { font-size: 14px; font-weight: 500; }
+.np-dump-text { font-size: 12px; color: var(--muted); }
+
+/* Dates and priority */
+.due { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.due.late { color: #E0607E; }
+.prio { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.prio.p1 { background: #E5484D; }
+.prio.p2 { background: #F2A33A; }
+.prio.p3 { background: #5AA9E6; }
+.item .due { margin-top: 3px; }
+.due-pick { position: relative; display: inline-flex; flex: none; }
+.due-btn { padding: 4px 8px; border-radius: 999px; background: var(--bg); }
+.due-btn:hover { background: var(--hover); }
+.tasks .due-btn { margin-top: 3px; }
+.tray-top .due-pick .icon { opacity: 1; }
+.due-menu { right: 0; left: auto; width: 220px; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.due-menu input { border: 1px solid var(--line); border-radius: 8px; margin: 0; padding: 7px 8px; color: var(--ink); font: inherit; font-size: 14px; }
+.due-prios { display: flex; gap: 4px; }
+.due-prios button { flex: 1; justify-content: center; gap: 6px; padding: 6px 4px; font-size: 12px; color: var(--muted); }
+.due-prios button.on { color: var(--ink); }
+.due-clear { justify-content: center; font-size: 13px; color: var(--muted); }
+
+/* Hub side panel tabs and the Tasks bar */
+.heading.tabs { gap: 4px; }
+.tabs button { font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); padding: 6px 10px; border-radius: 999px; }
+.tabs button:first-child { margin-left: -10px; }
+.tabs button:hover { color: var(--ink); }
+.tabs button.on { color: var(--ink); background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.agenda { display: flex; flex-direction: column; gap: 6px; }
+.agenda ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.agenda li { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border-radius: var(--radius); padding: 10px 12px; }
+.agenda .pick-head { padding: 8px 2px 2px; }
+.agenda .check { width: 20px; height: 20px; flex: none; margin-top: 1px; border-radius: 6px; box-shadow: inset 0 0 0 1.5px var(--muted); display: grid; place-items: center; color: transparent; }
+.agenda .check:hover { color: var(--muted); }
+.agenda .check svg { width: 14px; height: 14px; }
+.agenda-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.agenda-text { text-align: left; font-weight: 500; overflow-wrap: anywhere; }
+.agenda-text:hover { text-decoration: underline; text-underline-offset: 3px; }
+.agenda-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.agenda-project { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.agenda-project .dot { width: 8px; height: 8px; border-radius: 2px; }
+.agenda-none { font-size: 14px; color: var(--muted); margin: 4px 2px; }
+.tray-top .due-menu { left: 0; right: auto; }
+
+/* Tasks: the add box, dates you can change in place, and a date button on Pantry rows */
+.agenda-add { background: var(--surface); border-radius: var(--radius); padding: 8px 8px 8px 12px; }
+.agenda-add input { border: 0; background: none; outline: none; font: inherit; color: var(--ink); padding: 4px 0; }
+.agenda-meta .due-menu { left: 0; right: auto; }
+.agenda-meta .due-btn { padding: 2px 8px; margin-left: -8px; background: none; }
+.agenda-meta .due-btn:hover { background: var(--hover); }
+.item .aside-top { display: flex; align-items: center; gap: 2px; align-self: flex-end; }
+.item .due-pick .icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+.item .due-pick .icon:hover { background: var(--hover); color: var(--ink); }
+.item .due-pick .fade { opacity: 0; }
+.item:hover .due-pick .fade, .item .due-pick .fade:focus-visible, .item .due-pick .fade[aria-expanded="true"] { opacity: 1; }
+.item .due-menu { left: auto; right: 0; cursor: auto; }
+.writing-text.overview { cursor: auto; min-height: 0; }
+.ask-a { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
+/* Projects that match a search, above the Pantry items */
+.found { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.found a { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border-radius: var(--radius); padding: 10px 12px; }
+.found a:hover { box-shadow: 0 0 0 1px var(--line); }
+.found .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; margin-top: 5px; }
+.found-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.found-title { font-weight: 600; }
+.found-hit { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
