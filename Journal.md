@@ -64,10 +64,11 @@ Ordered. Feature numbers match the plan.
 
 ## Log
 
-### 2026-10-25 · Typed dates and a time list (PR #11)
+### 2026-10-25 · Typed dates, a time list, new projects stay on the Hub (PR #11)
 
 - **The date is typed now**, because the browser's date field kept losing what Mehvish picked. `parseDate` in `lib/due.ts` reads "today", "tomorrow", weekdays ("fri", "next mon"), "in 3 days", "2w", "10/27", "10/27/2026", "oct 27", "27 oct", and "2026-10-27". A date without a year is the next one to come. The line under the box shows the day it read, or a hint when it can't read it. It's saved when the menu closes (Enter, a click outside, or Escape), so the row doesn't jump to another group while you type.
 - **Time is a list** of half hours (plus the current time if it's off the half hour), instead of the browser's time field.
+- **New projects stay on the Hub:** Create adds the card and closes the box, instead of opening the project.
 - **Tasks list:** the groups are now headings inside one list, so a row keeps its open menu when it moves to another group.
 
 ### 2026-10-25 · Round 8: the app is Oven, the Brain Dump is the Pantry (PR #10)
