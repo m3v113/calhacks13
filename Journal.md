@@ -8,7 +8,7 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** rounds 4 to 6 (PR #10): Resources, AI section, Project Dumps, search, the live Cartesia mic, and the Tasks page. Next: a voice feature for the Cartesia track, once Mehvish picks one (`plans/cartesia-voice.md`).
+**Working on:** rounds 4 to 7 (PR #10): Resources, AI section, Project Dumps, search, the live Cartesia mic, and the Tasks page. Next: a voice feature for the Cartesia track, once Mehvish picks one (`plans/cartesia-voice.md`).
 **Done:** F1 Smart Inbox, now called Brain Dump (PR #5, renamed in PR #7), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
@@ -63,6 +63,14 @@ Ordered. Feature numbers match the plan.
 ---
 
 ## Log
+
+### 2026-10-25 · Round 7: date fixes, project search, read-only Overview (PR #10)
+
+- **Dates said "No date" after picking one:** each change in the date menu was saved on its own, and the list reloaded after each save. A reload that came back late could replace newer choices, so the menu showed a date that the list didn't have. Now the menu keeps its own copy while it's open, every change sends date, time, and priority together, and only the newest reload counts (in the Tasks list and the Brain Dump). Typed dates and times are also read again when you leave the field. Safari-style date fields (Mehvish's browser) couldn't be tested here, only Chromium.
+- **Calendar button** on Brain Dump rows is now to the left of the trash can, shown on hover. The date itself stays under the title.
+- **AI answers** scroll inside their box (at most 420 px tall), so a long answer doesn't take over the page.
+- **Overview is read-only:** a new `overview` section type, shown as formatted text without the editor. Existing Auto-project Overviews are converted on load. The AI section still reads it.
+- **Search finds projects:** `GET /api/search?q=` looks at each project's name, goal, context, section titles, writing, tasks, and Project Dump items, and returns up to 8 with the words that matched. They show above the Brain Dump results.
 
 ### 2026-10-25 · Round 6: live mic, Project Dump, Tasks page, speed (PR #10)
 

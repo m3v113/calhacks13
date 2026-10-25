@@ -42,7 +42,7 @@ async function context(projectId: string, q: string) {
     },
   });
   if (!p) return null;
-  const writing = p.sections.filter((s) => s.type === "writing" && s.notes?.trim()).map((s) => `## ${s.title}\n${text(s.notes!).slice(0, 2500)}`);
+  const writing = p.sections.filter((s) => (s.type === "writing" || s.type === "overview") && s.notes?.trim()).map((s) => `## ${s.title}\n${text(s.notes!).slice(0, 2500)}`);
   const tasks = p.sections.filter((s) => s.type === "tasks" && s.tasks.length).map((s) => `## ${s.title}\n${s.tasks.map((t) => `- [${t.done ? "x" : " "}] ${t.text}`).join("\n")}`);
   const items = await Promise.all(p.items.map(async (i) => {
     const page = i.url ? await db.pageCache.findUnique({ where: { url: i.url }, select: { text: true, summary: true } }) : null;

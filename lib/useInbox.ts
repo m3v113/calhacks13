@@ -28,11 +28,15 @@ export function useInbox() {
   const [vision, setVision] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Only the newest load counts, so an answer that comes back late can't undo a change made since.
+  const seq = useRef(0);
   const load = useCallback(async () => {
     clearTimeout(timer.current);
+    const n = ++seq.current;
     try {
       const r = await fetch("/api/items", { cache: "no-store" });
       const data = await r.json();
+      if (n !== seq.current) return;
       setCategories(data.categories);
       setItems(data.items);
       // Poll quickly while something is still sorting, slowly otherwise.
@@ -94,6 +98,7 @@ export function useInbox() {
   }, [patch]);
 
   const setDue = useCallback((id: string, due: { dueDate?: string | null; dueTime?: string | null; priority?: number | null }) => {
+    seq.current++;
     setItems((xs) => xs.map((i) => (i.id === id ? { ...i, ...due } : i)));
     return patch(id, due);
   }, [patch]);

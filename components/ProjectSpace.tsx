@@ -240,6 +240,8 @@ export default function ProjectSpace({ id }: { id: string }) {
                 </>
               )}
               {s.type === "writing" && <Writing label={s.title} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />}
+              {/* The AI's Overview is for reading; its HTML is built and escaped on the server. */}
+              {s.type === "overview" && <div className="writing-text overview" dangerouslySetInnerHTML={{ __html: (s.notes ?? "").replace(/<a href=/g, '<a target="_blank" rel="noreferrer" href=') }} />}
               {s.type === "sources" && <Sources project={project} inbox={inbox} reload={load} onOpen={setViewing} link={link} unlink={unlink} />}
               {s.type === "resources" && <Resources section={s} busy={more?.id === s.id && more.busy} note={more?.id === s.id ? more.note : null}
                 onChange={(notes) => patchSection(s.id, { notes })}

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DuePicker, isLate, type Due } from "./Due";
 import { CheckIcon, PlusIcon } from "./Icons";
 
@@ -25,9 +25,13 @@ export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
   const [list, setList] = useState<Entry[] | null>(null);
   const [text, setText] = useState("");
   const [due, setDue] = useState<Due>(NONE);
+  // Only the newest load counts, so an answer that comes back late can't undo a change made since.
+  const seq = useRef(0);
   const load = useCallback(async () => {
+    const n = ++seq.current;
     const r = await fetch("/api/agenda", { cache: "no-store" }).catch(() => null);
-    if (r?.ok) setList(await r.json());
+    const list = r?.ok ? await r.json() : null;
+    if (list && n === seq.current) setList(list);
   }, []);
   useEffect(() => {
     load();
@@ -36,10 +40,12 @@ export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
   }, [load]);
   const url = (e: Entry) => `/api/${e.kind === "item" ? "items" : "tasks"}/${e.id}`;
   const check = (e: Entry) => {
+    seq.current++;
     setList((l) => l?.filter((x) => x.id !== e.id) ?? l);
     send(url(e), "PATCH", { done: true });
   };
   const change = (e: Entry, d: Partial<Due>) => {
+    seq.current++;
     setList((l) => l?.map((x) => (x.id === e.id ? { ...x, ...d } : x)) ?? l);
     send(url(e), "PATCH", d).then(load);
   };

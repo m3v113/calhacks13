@@ -636,9 +636,22 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 /* Tasks: the add box, dates you can change in place, and a date button on Brain Dump rows */
 .agenda-add { background: var(--surface); border-radius: var(--radius); padding: 8px 8px 8px 12px; }
 .agenda-add input { border: 0; background: none; outline: none; font: inherit; color: var(--ink); padding: 4px 0; }
-.agenda-meta .due-menu, .item .due-menu { left: 0; right: auto; }
-.agenda-meta .due-btn, .item .due-btn { padding: 2px 8px; margin-left: -8px; background: none; }
-.agenda-meta .due-btn:hover, .item .due-btn:hover { background: var(--hover); }
-.item .due-pick { margin-top: 3px; }
-.item .due-pick .fade { opacity: 0; margin-left: -6px; }
+.agenda-meta .due-menu { left: 0; right: auto; }
+.agenda-meta .due-btn { padding: 2px 8px; margin-left: -8px; background: none; }
+.agenda-meta .due-btn:hover { background: var(--hover); }
+.item .aside-top { display: flex; align-items: center; gap: 2px; align-self: flex-end; }
+.item .due-pick .icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+.item .due-pick .icon:hover { background: var(--hover); color: var(--ink); }
+.item .due-pick .fade { opacity: 0; }
 .item:hover .due-pick .fade, .item .due-pick .fade:focus-visible, .item .due-pick .fade[aria-expanded="true"] { opacity: 1; }
+.item .due-menu { left: auto; right: 0; cursor: auto; }
+.writing-text.overview { cursor: auto; min-height: 0; }
+.ask-a { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
+/* Projects that match a search, above the Brain Dump items */
+.found { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.found a { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border-radius: var(--radius); padding: 10px 12px; }
+.found a:hover { box-shadow: 0 0 0 1px var(--line); }
+.found .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; margin-top: 5px; }
+.found-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.found-title { font-weight: 600; }
+.found-hit { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }

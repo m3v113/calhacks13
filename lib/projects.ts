@@ -5,7 +5,7 @@ import { names } from "./names";
 import { chatJSON, ollamaUp } from "./ollama";
 import { search, searchReady, type Hit } from "./scouts";
 
-export const SECTION_TYPES = ["writing", "tasks", "sources", "step", "resources", "assistant"] as const;
+export const SECTION_TYPES = ["writing", "tasks", "sources", "step", "resources", "assistant", "overview"] as const;
 // Sections you can add yourself inside a project, and the ones the AI picks from when it sets one up.
 export const ADDABLE = ["writing", "tasks", "assistant"] as const;
 const PLANNED = ["writing", "tasks", "sources"] as const;
@@ -334,7 +334,7 @@ async function planAuto(id: string) {
     const overview = await checkLinks(parts.filter((s) => s.html).map((s) => `<h2>${esc(s.title)}</h2>${s.html}`).join(""));
     const tasks = parts.flatMap((s) => s.tasks).slice(0, 12);
     const planned = [
-      overview && { title: "Overview", type: "writing", span: 2, notes: overview, tasks: [] as string[] },
+      overview && { title: "Overview", type: "overview", span: 2, notes: overview, tasks: [] as string[] },
       tasks.length && { title: "To do", type: "tasks", span: 1, notes: null, tasks },
     ].filter(Boolean) as NewSection[];
     await addSections(id, planned);
@@ -381,6 +381,8 @@ export async function upgradeSections() {
   await db.section.updateMany({ where: { proposed: true }, data: { proposed: false } });
   await db.task.updateMany({ where: { proposed: true }, data: { proposed: false } });
   // Resources used to be a Writing section with a list of links. Now it's a read-only list.
+  // An Auto project's Overview is read-only now (its own type).
+  await db.section.updateMany({ where: { type: "writing", title: "Overview", project: { kind: "auto" } }, data: { type: "overview" } });
   const old = await db.section.findMany({ where: { type: "writing", title: "Resources" }, include: { project: { select: { title: true, goal: true } } } });
   for (const sec of old) {
     const hits = [...(sec.notes ?? "").matchAll(/<li><p><a href="([^"]+)"[^>]*>(.*?)<\/a>(?:\s*·\s*(.*?))?<\/p><\/li>/g)].map((m) => ({
