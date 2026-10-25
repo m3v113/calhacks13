@@ -6,7 +6,7 @@ import ItemView from "./ItemView";
 import Nav from "./Nav";
 import { names } from "@/lib/names";
 
-// The Tasks bar on its own page: everything with a date, time, or priority, from the Brain Dump and every project.
+// The Tasks bar on its own page: everything with a date, time, or priority, from the Pantry and every project.
 export default function TasksPage() {
   const inbox = useInbox();
   const [viewing, setViewing] = useState<string | null>(null);

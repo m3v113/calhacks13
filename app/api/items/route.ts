@@ -5,8 +5,8 @@ import { MAX_BYTES, extractText, saveUpload } from "@/lib/files";
 import { sortItem, sweep } from "@/lib/sort";
 import { dueFields } from "@/lib/due";
 
-// The Brain Dump: categories (with counts) and items that aren't archived. Items in a project live in that
-// project's own Brain Dump, so they aren't listed here; the main one holds what's still to be sorted into projects.
+// The Pantry: categories (with counts) and items that aren't archived. Items in a project live in that
+// project's own Pantry, so they aren't listed here; the main one holds what's still to be sorted into projects.
 export async function GET() {
   await ensureSeed();
   const where = { archived: false, projectId: null };

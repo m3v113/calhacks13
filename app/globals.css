@@ -540,7 +540,7 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .mic-note { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; width: max-content; max-width: 240px; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
 .capture .mic .icon { width: 36px; height: 36px; }
 
-/* Brain Dump search */
+/* Pantry search */
 .find { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; padding: 0 4px 0 10px; border-radius: 10px; color: var(--muted); }
 .find:focus-within, .find:hover { background: var(--hover); }
 .find > svg { width: 15px; height: 15px; flex: none; }
@@ -585,7 +585,7 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .res-actions { position: absolute; top: 6px; right: -6px; display: flex; opacity: 0; transition: opacity .12s; }
 .resources li:hover .res-actions, .res-actions:focus-within { opacity: 1; }
 .res-actions .icon[data-tip]:hover::after { left: auto; right: 0; transform: none; }
-/* The project's own Brain Dump in the New project box: always there, so it looks apart from the sections. */
+/* The project's own Pantry in the New project box: always there, so it looks apart from the sections. */
 .np-sections li.np-dump { margin-top: 4px; padding: 7px 8px; border: 1px dashed var(--line); border-radius: 10px; gap: 8px; flex-wrap: wrap; }
 .np-dump .np-lock { width: auto; height: auto; opacity: 1; }
 .np-dump-name { font-size: 14px; font-weight: 500; }
@@ -633,7 +633,7 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .agenda-none { font-size: 14px; color: var(--muted); margin: 4px 2px; }
 .tray-top .due-menu { left: 0; right: auto; }
 
-/* Tasks: the add box, dates you can change in place, and a date button on Brain Dump rows */
+/* Tasks: the add box, dates you can change in place, and a date button on Pantry rows */
 .agenda-add { background: var(--surface); border-radius: var(--radius); padding: 8px 8px 8px 12px; }
 .agenda-add input { border: 0; background: none; outline: none; font: inherit; color: var(--ink); padding: 4px 0; }
 .agenda-meta .due-menu { left: 0; right: auto; }
@@ -647,7 +647,7 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .item .due-menu { left: auto; right: 0; cursor: auto; }
 .writing-text.overview { cursor: auto; min-height: 0; }
 .ask-a { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
-/* Projects that match a search, above the Brain Dump items */
+/* Projects that match a search, above the Pantry items */
 .found { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .found a { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border-radius: var(--radius); padding: 10px 12px; }
 .found a:hover { box-shadow: 0 0 0 1px var(--line); }

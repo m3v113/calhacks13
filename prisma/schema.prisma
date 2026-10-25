@@ -98,7 +98,7 @@ model Section {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  type      String // "writing" | "tasks" | "sources" (the project's Brain Dump) | "resources" (Auto: links from a web search, read-only, JSON in notes) | "assistant" (ask the AI, JSON in notes) | "step" (older Auto); older: "notes", "items", "providers"
+  type      String // "writing" | "tasks" | "sources" (the project's Pantry) | "resources" (Auto: links from a web search, read-only, JSON in notes) | "assistant" (ask the AI, JSON in notes) | "step" (older Auto); older: "notes", "items", "providers"
   proposed  Boolean  @default(false) // made by the AI and not yet kept
   title     String
   order     Int      @default(0)

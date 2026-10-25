@@ -1,4 +1,4 @@
-// Deadlines and priority, shared by Brain Dump items and project tasks.
+// Deadlines and priority, shared by Pantry items and project tasks.
 export const PRIORITIES = [{ n: 1, label: "High" }, { n: 2, label: "Medium" }, { n: 3, label: "Low" }] as const;
 
 // Only well-formed values are saved; null clears one. Anything else leaves it as it is.

@@ -136,7 +136,7 @@ export default function ProjectSpace({ id }: { id: string }) {
     api(`/api/sections/${s.id}`, "DELETE");
   };
   const remove = () => {
-    if (!confirm(`Delete "${project.title}"? Its sources stay in the inbox.`)) return;
+    if (!confirm(`Delete "${project.title}"? Its Project Dump goes back to the ${names.inbox}.`)) return;
     api(`/api/projects/${id}`, "DELETE").then(() => router.push("/"));
   };
   const toScout = (brief: string, taskId?: string) => setScoutDraft((d) => ({ brief, taskId, n: (d?.n ?? 0) + 1 }));
@@ -359,7 +359,7 @@ function SourceRow({ item, color, onOpen, onRemove }: { item: Item; color?: stri
 }
 
 // The Project Dump: this project's own items sorted by category, the ones of linked projects, a box to add
-// new ones (they stay in this project), and a picker to move items over from the main Brain Dump.
+// new ones (they stay in this project), and a picker to move items over from the main Pantry.
 function Sources({ project, inbox, reload, onOpen, link, unlink }: {
   project: Project; inbox: Inbox; reload: () => void; onOpen: (id: string) => void; link: (item: Item) => void; unlink: (id: string) => void;
 }) {
@@ -370,7 +370,7 @@ function Sources({ project, inbox, reload, onOpen, link, unlink }: {
   const ref = useDismiss<HTMLDivElement>(picking, () => setPicking(false));
   const color = new Map(inbox.categories.map((c) => [c.id, c.color]));
   const mine = new Set(project.items.map((i) => i.id));
-  // Grouped like the main Brain Dump: one group per category, in the same order, then anything not sorted yet.
+  // Grouped like the main Pantry: one group per category, in the same order, then anything not sorted yet.
   const groups = [
     ...inbox.categories.map((c) => ({ id: c.id, name: c.name, items: project.items.filter((i) => i.categoryId === c.id) })),
     { id: "none", name: "", items: project.items.filter((i) => !i.categoryId || !color.has(i.categoryId)) },

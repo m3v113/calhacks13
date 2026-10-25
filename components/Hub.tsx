@@ -142,7 +142,7 @@ export default function Hub() {
           return { x: (r.width / 2 - view.x) / view.z - 130 + (n % 5) * 24, y: (r.height / 2 - view.y) / view.z - 60 + (n % 5) * 24 };
         }} />
       </div>
-      <button className="toggle" onClick={() => setPanel(!panel)} aria-label={panel ? "Hide inbox" : "Show inbox"}>
+      <button className="toggle" onClick={() => setPanel(!panel)} aria-label={panel ? `Hide ${names.inbox}` : `Show ${names.inbox}`}>
         <PanelIcon />
       </button>
       {panel && (

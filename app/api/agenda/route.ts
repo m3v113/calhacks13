@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 const DATED = [{ dueDate: { not: null } }, { dueTime: { not: null } }, { priority: { not: null } }];
 const PROJECT = { select: { id: true, title: true, color: true } };
 
-// The Tasks bar: every Brain Dump item and project task that has a date, time, or priority and isn't done.
+// The Tasks bar: every Pantry item and project task that has a date, time, or priority and isn't done.
 // Soonest first; ones without a date go last, by priority.
 export async function GET() {
   const [items, tasks] = await Promise.all([

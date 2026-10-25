@@ -1,4 +1,4 @@
-# Project Scaffold
+# Oven
 
 - Read `Journal.md` first for context: what's built, the decisions behind it, and what's next. `README.md` covers setup and where things are.
 - Don't edit `Journal.md`. It's updated by the project owner when a PR is merged. Describe what you changed in the PR instead.

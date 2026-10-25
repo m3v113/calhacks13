@@ -19,8 +19,8 @@ const NONE: Due = { dueDate: null, dueTime: null, priority: null };
 const send = (url: string, method: string, body: object) =>
   fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
-// The Tasks bar: Brain Dump items and project tasks with a date, time, or priority, soonest first.
-// A task added here goes to the Brain Dump, due today unless you pick a date.
+// The Tasks bar: Pantry items and project tasks with a date, time, or priority, soonest first.
+// A task added here goes to the Pantry, due today unless you pick a date.
 export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
   const [list, setList] = useState<Entry[] | null>(null);
   const [text, setText] = useState("");
@@ -66,7 +66,7 @@ export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
           onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) add(); if (e.key === "Escape") setText(""); }} />
         <DuePicker due={due} onChange={(d) => setDue({ ...due, ...d })} />
       </div>
-      {!list.length && <p className="muted agenda-none">Give a Brain Dump item or a project task a date or priority, and it shows here.</p>}
+      {!list.length && <p className="muted agenda-none">Give a Pantry item or a project task a date or priority, and it shows here.</p>}
       {GROUPS.map((g) => {
         const rows = list.filter(g.test);
         return rows.length > 0 && (

@@ -125,7 +125,7 @@ export function Card({ project, projects, view, draft, onConnect }: {
             <Swatches value={project.color} onPick={(color) => projects.save(project.id, { color })} />
             <button className="danger" onClick={() => {
               setMenu(false);
-              if (confirm(`Delete "${project.title}"? Its sources stay in the inbox.`)) projects.remove(project.id);
+              if (confirm(`Delete "${project.title}"? Its Project Dump goes back to the ${names.inbox}.`)) projects.remove(project.id);
             }}><TrashIcon />Delete</button>
           </div>
         )}
@@ -347,7 +347,7 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
                 </div>
               )}
               <div className="np-add" ref={pickRef}>
-                <button aria-expanded={picking} onClick={() => setPicking(!picking)}><PlusIcon />From inbox</button>
+                <button aria-expanded={picking} onClick={() => setPicking(!picking)}><PlusIcon />From {names.inbox}</button>
                 {picking && <InboxPicker inbox={inbox} inline exclude={new Set(picked.map((i) => i.id))} onPick={(i) => setPicked([...picked, i])} />}
               </div>
             </div>

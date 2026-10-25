@@ -376,7 +376,7 @@ export async function upgradeSections() {
   await db.section.updateMany({ where: { type: "items" }, data: { type: "sources" } });
   await db.section.deleteMany({ where: { type: "providers" } });
   // The project's own Sources section is now the Project Dump (it was briefly called Brain Dump).
-  await db.section.updateMany({ where: { type: "sources", title: { in: ["Sources", names.inbox] } }, data: { title: names.projectDump } });
+  await db.section.updateMany({ where: { type: "sources", title: { in: ["Sources", "Brain Dump"] } }, data: { title: names.projectDump } });
   // AI sections used to wait for you to keep them. Now they're just there.
   await db.section.updateMany({ where: { proposed: true }, data: { proposed: false } });
   await db.task.updateMany({ where: { proposed: true }, data: { proposed: false } });

@@ -1,6 +1,6 @@
 # Journal
 
-The running log for Project Scaffold: what's done, what's next, and why. Newest entries go at the top of **Log**. The plan (`Project_Scaffold_Plan.md`) says what we're building; this file says what actually happened.
+The running log for Oven: what's done, what's next, and why. Newest entries go at the top of **Log**. The plan (`Project_Scaffold_Plan.md`) says what we're building; this file says what actually happened.
 
 > **Read-only for contributors.** Read this for context on how the app works and why. Please don't edit it in your PRs: Mehvish's Claude updates it when each PR is merged. (The plan itself isn't in the repo.)
 
@@ -8,8 +8,8 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** rounds 4 to 7 (PR #10): Resources, AI section, Project Dumps, search, the live Cartesia mic, and the Tasks page. Next: a voice feature for the Cartesia track, once Mehvish picks one (`plans/cartesia-voice.md`).
-**Done:** F1 Smart Inbox, now called Brain Dump (PR #5, renamed in PR #7), F3 + F4 first version (PR #6, merged).
+**Working on:** rounds 4 to 8 (PR #10): Resources, AI section, Project Dumps, search, the live Cartesia mic, and the Tasks page. Next: a voice feature for the Cartesia track, once Mehvish picks one (`plans/cartesia-voice.md`).
+**Done:** F1 Smart Inbox, now called Pantry (PR #5, renamed Brain Dump in PR #7, Pantry in round 8), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
 
@@ -63,6 +63,12 @@ Ordered. Feature numbers match the plan.
 ---
 
 ## Log
+
+### 2026-10-25 · Round 8: the app is Oven, the Brain Dump is the Pantry (PR #10)
+
+- Mehvish renamed the app to **Oven** and the Brain Dump to **Pantry**. Both names live in `lib/names.ts`, so the UI, page titles, and tooltips follow. The package is `oven`, and the README, `CLAUDE.md`, `.env.example`, and code comments use the new names. Entries below this one keep the names used at the time.
+- A project's own section stays **Project Dump**. Old project sections still titled "Brain Dump" or "Sources" are renamed to Project Dump on load.
+- The GitHub repo (`m3v113/calhacks13`) and the Mac folder (`project_manager`) keep their names.
 
 ### 2026-10-25 · Round 7: date fixes, project search, read-only Overview (PR #10)
 
