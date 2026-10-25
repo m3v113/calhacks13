@@ -67,29 +67,28 @@ export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
         <DuePicker due={due} onChange={(d) => setDue({ ...due, ...d })} />
       </div>
       {!list.length && <p className="muted agenda-none">Give a Pantry item or a project task a date or priority, and it shows here.</p>}
-      {GROUPS.map((g) => {
-        const rows = list.filter(g.test);
-        return rows.length > 0 && (
-          <div key={g.name} className="agenda-group">
-            <div className="pick-head">{g.name}</div>
-            <ul>
-              {rows.map((e) => (
-                <li key={e.id}>
-                  <button className="check" aria-label="Mark done" onClick={() => check(e)}><CheckIcon /></button>
-                  <div className="agenda-body">
-                    {e.kind === "item" ? <button className="agenda-text" onClick={() => onOpen(e.id)}>{e.text}</button>
-                      : <Link className="agenda-text" href={`/p/${e.project?.id}`}>{e.text}</Link>}
-                    <div className="agenda-meta">
-                      <DuePicker due={e} onChange={(d) => change(e, d)} />
-                      {e.project && <span className="agenda-project"><span className="dot square" style={{ background: e.project.color ?? "var(--muted)" }} />{e.project.title}</span>}
-                    </div>
+      {/* One list with the group headings in it, so a row keeps its open date menu when a new date moves it to another group. */}
+      <ul>
+        {GROUPS.flatMap((g, gi) => {
+          const rows = list.filter((e) => GROUPS.findIndex((x) => x.test(e)) === gi);
+          return rows.length ? [
+            <li key={`group-${g.name}`} className="pick-head">{g.name}</li>,
+            ...rows.map((e) => (
+              <li key={e.id}>
+                <button className="check" aria-label="Mark done" onClick={() => check(e)}><CheckIcon /></button>
+                <div className="agenda-body">
+                  {e.kind === "item" ? <button className="agenda-text" onClick={() => onOpen(e.id)}>{e.text}</button>
+                    : <Link className="agenda-text" href={`/p/${e.project?.id}`}>{e.text}</Link>}
+                  <div className="agenda-meta">
+                    <DuePicker due={e} onChange={(d) => change(e, d)} />
+                    {e.project && <span className="agenda-project"><span className="dot square" style={{ background: e.project.color ?? "var(--muted)" }} />{e.project.title}</span>}
                   </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
+                </div>
+              </li>
+            )),
+          ] : [];
+        })}
+      </ul>
     </div>
   );
 }
