@@ -125,7 +125,7 @@ export function Card({ project, projects, view, draft, onConnect }: {
             <Swatches value={project.color} onPick={(color) => projects.save(project.id, { color })} />
             <button className="danger" onClick={() => {
               setMenu(false);
-              if (confirm(`Delete "${project.title}"? Its Project Dump goes back to the ${names.inbox}.`)) projects.remove(project.id);
+              if (confirm(`Delete "${project.title}"? Its Project Dump stays in the ${names.inbox}.`)) projects.remove(project.id);
             }}><TrashIcon />Delete</button>
           </div>
         )}
@@ -198,14 +198,14 @@ const KIND_TEXT: Record<Kind, string> = {
   auto: "The AI lays it out for you: what to know, what to get, and what to do. Give it anything that helps.",
 };
 
-// Space or Auto, with a line on what each one means.
+// Manual or Assisted, with a line on what each one means.
 function KindSwitch({ value, onChange }: { value: Kind; onChange: (k: Kind) => void }) {
   return (
     <div className="kind">
       <div className="kind-switch" role="radiogroup" aria-label="Kind of project">
         {(["space", "auto"] as const).map((k) => (
           <button key={k} role="radio" aria-checked={value === k} className={value === k ? "on" : ""} onClick={() => onChange(k)}>
-            {k === "space" ? "Space" : "Auto"}
+            {names[k]}
           </button>
         ))}
       </div>
@@ -216,8 +216,8 @@ function KindSwitch({ value, onChange }: { value: Kind; onChange: (k: Kind) => v
 
 const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "Tasks" }, { type: "assistant", label: "AI" }];
 
-// "+" on the Hub: one sentence → a suggested name and kind → for a Space, its sections (reorder, rename,
-// retype, add); for Auto, what the AI should start from → create.
+// "+" on the Hub: one sentence → a suggested name and kind → for a Manual project, its sections (reorder, rename,
+// retype, add); for Assisted, what the AI should start from → create.
 export function NewProject({ projects, inbox, at }: { projects: Projects; inbox: ReturnType<typeof useInbox>; at: () => { x: number; y: number } }) {
   const [open, setOpen] = useState(false);
   const [goal, setGoal] = useState("");

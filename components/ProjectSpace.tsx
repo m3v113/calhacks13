@@ -136,7 +136,7 @@ export default function ProjectSpace({ id }: { id: string }) {
     api(`/api/sections/${s.id}`, "DELETE");
   };
   const remove = () => {
-    if (!confirm(`Delete "${project.title}"? Its Project Dump goes back to the ${names.inbox}.`)) return;
+    if (!confirm(`Delete "${project.title}"? Its Project Dump stays in the ${names.inbox}.`)) return;
     api(`/api/projects/${id}`, "DELETE").then(() => router.push("/"));
   };
   const toScout = (brief: string, taskId?: string) => setScoutDraft((d) => ({ brief, taskId, n: (d?.n ?? 0) + 1 }));
@@ -353,7 +353,7 @@ function SourceRow({ item, color, onOpen, onRemove }: { item: Item; color?: stri
     <li onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) onOpen(); }}>
       <span className={`dot ${pending ? "pending" : ""}`} style={pending ? undefined : { background: color || "var(--line)" }} />
       <span className="name">{itemName(item)}</span>
-      {onRemove && <button className="icon small fade" aria-label={`Back to ${names.inbox}`} data-tip={`Back to ${names.inbox}`} onClick={onRemove}><CloseIcon /></button>}
+      {onRemove && <button className="icon small fade" aria-label={`Remove from ${names.projectDump}`} data-tip="Remove from project" onClick={onRemove}><CloseIcon /></button>}
     </li>
   );
 }

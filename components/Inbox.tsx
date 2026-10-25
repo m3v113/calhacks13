@@ -121,10 +121,15 @@ const ADD: { kind: "note" | "link" | "image" | "document"; label: string; Icon: 
 // Words to look for in an item: its title, text, address, file name, and summary.
 export const matches = (i: Item, q: string) => !q || [i.title, i.text, i.url, i.fileName, i.summary].join(" ").toLowerCase().includes(q);
 
-// The capture box (with the + menu and the mic), a search box, and the item list. `exclude` hides items (e.g. ones already in a project).
-export function InboxList({ inbox, selected, exclude }: { inbox: Inbox; selected: string | null; exclude?: Set<string> }) {
+// Which items the list shows: all of them, the ones not in a project yet, or the ones in one.
+const SORTS = [["all", "All"], ["unsorted", "Unsorted"], ["sorted", "In projects"]] as const;
+type Sort = (typeof SORTS)[number][0];
+
+// The capture box (with the + menu and the mic), a search box, the Unsorted / In projects filter, and the item list.
+export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string | null }) {
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
+  const [sort, setSort] = useState<Sort>("all");
   const [mode, setMode] = useState<"note" | "link">("note");
   const [adding, setAdding] = useState(false);
   const [dropping, setDropping] = useState(false);
@@ -145,7 +150,8 @@ export function InboxList({ inbox, selected, exclude }: { inbox: Inbox; selected
     }, 250);
     return () => { live = false; clearTimeout(t); };
   }, [needle]);
-  const items = inbox.items.filter((i) => (!selected || i.categoryId === selected) && !exclude?.has(i.id) && matches(i, needle));
+  const items = inbox.items.filter((i) => (!selected || i.categoryId === selected)
+    && (sort === "all" || (sort === "sorted") === !!i.projectId) && matches(i, needle));
 
   useEffect(() => {
     const el = box.current;
@@ -233,6 +239,13 @@ export function InboxList({ inbox, selected, exclude }: { inbox: Inbox; selected
           {q && <button className="icon small" aria-label="Clear search" onClick={() => setQ("")}><CloseIcon /></button>}
         </div>
       )}
+      {inbox.items.length > 0 && (
+        <div className="pick-cats sorts" role="tablist">
+          {SORTS.map(([s, label]) => (
+            <button key={s} role="tab" aria-selected={sort === s} className={sort === s ? "on" : ""} onClick={() => setSort(s)}>{label}</button>
+          ))}
+        </div>
+      )}
       {needle && found.length > 0 && (
         <ul className="found">
           {found.map((p) => (
@@ -304,6 +317,11 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
         {item.kind === "link" && !heading && <div className="text">{(item.url && fromUrl(item.url)) ?? item.url ?? text}</div>}
         {item.url && <div className="host">{host(item.url)}</div>}
         {item.kind === "document" && !pending && item.title !== item.fileName && <div className="host">{item.fileName}</div>}
+        {item.project && (
+          <Link href={`/p/${item.project.id}`} className="in-project">
+            <span className="dot square" style={{ background: item.project.color ?? "var(--muted)" }} />{item.project.title}
+          </Link>
+        )}
         <DueChip due={due} />
       </div>
       {item.kind === "image" && !item.id.startsWith("tmp-") && (
