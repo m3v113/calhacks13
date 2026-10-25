@@ -2,9 +2,9 @@
 
 A home for messy personal projects that runs entirely on your own computer.
 
-- **Hub** (`/`): an infinite canvas with a card for each project, and the Smart Inbox on the side.
+- **Hub** (`/`): an infinite canvas with a card for each project, and the Brain Dump on the side.
 - **Project space** (`/p/...`): one project's tasks, notes, and saved inbox items, with a short summary of where it stands.
-- **Smart Inbox** (`/inbox`): drop in anything (notes, links, images, documents). Local AI sorts each item into a category and gives it a short title.
+- **Brain Dump** (`/inbox`): drop in anything (notes, links, images, documents). Local AI sorts each item into a category and gives it a short title.
 
 Everything is stored in one file on your computer, and the AI runs locally with [Ollama](https://ollama.com). No account and no API key are needed, and nothing leaves your machine except reading the links you add. (One optional exception: if you set up Bright Data, the addresses of sites that block reading are sent to it. See [Settings](#settings-env).)
 
@@ -83,7 +83,7 @@ Hover over any icon to see what it does.
 | You see | It means |
 |---|---|
 | Four dots icon | The Hub (home page) |
-| Tray icon | The Smart Inbox page |
+| Tray icon | The Brain Dump page |
 | Half-filled circle, sun, or moon | Theme. Click to switch: **match Mac** (follows your Mac's Light/Dark setting) → **light** → **dark**. Your choice is remembered. |
 | **Green dot** | Local AI is running. Hover to see whether an image model is installed. |
 | **Yellow dot** | Ollama isn't running. Items are sorted by simple rules for now and re-sorted by AI once Ollama is back. |
@@ -198,7 +198,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | Path | What |
 |---|---|
 | `app/page.tsx` | Hub page (`/`) |
-| `app/inbox/page.tsx` | Smart Inbox page (`/inbox`) |
+| `app/inbox/page.tsx` | Brain Dump page (`/inbox`) |
 | `components/Hub.tsx` | Canvas (pan and zoom) and the inbox side panel |
 | `components/Inbox.tsx` | Category list (with New and drag and drop), add box and + menu, item rows, category menu |
 | `components/Nav.tsx` | Page icons and the status dot |
