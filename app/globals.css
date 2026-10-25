@@ -344,8 +344,6 @@ span.np-type { padding: 6px 8px; }
 .np-add > button svg { width: 13px; height: 13px; }
 .pick-items.inline { position: static; flex: 1 1 100%; width: 100%; max-height: 280px; box-shadow: none; }
 .np-add .pick-items.inline { order: 2; }
-.np-lock { width: 24px; height: 24px; flex: none; display: grid; place-items: center; color: var(--muted); opacity: .6; }
-.np-lock svg { width: 13px; height: 13px; }
 .np-start { display: flex; flex-direction: column; gap: 8px; }
 .np-start textarea { resize: vertical; border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; outline: none; background: none; min-height: 72px; }
 .np-start textarea:focus { border-color: var(--muted); }
@@ -587,7 +585,6 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .res-actions .icon[data-tip]:hover::after { left: auto; right: 0; transform: none; }
 /* The project's own Pantry in the New project box: always there, so it looks apart from the sections. */
 .np-sections li.np-dump { margin-top: 4px; padding: 7px 8px; border: 1px dashed var(--line); border-radius: 10px; gap: 8px; flex-wrap: wrap; }
-.np-dump .np-lock { width: auto; height: auto; opacity: 1; }
 .np-dump-name { font-size: 14px; font-weight: 500; }
 .np-dump-text { font-size: 12px; color: var(--muted); }
 
@@ -659,3 +656,6 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .found-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .found-title { font-weight: 600; }
 .found-hit { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.agenda li.done .check { background: var(--ink); box-shadow: none; color: var(--surface); }
+.agenda li.done .agenda-text { color: var(--muted); text-decoration: line-through; }
+.agenda li.done .due-pick { display: none; }

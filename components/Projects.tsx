@@ -7,7 +7,7 @@ import { DRAG } from "./Inbox";
 import Swatches from "./Swatches";
 import InboxPicker, { itemName } from "./InboxPicker";
 import { names } from "@/lib/names";
-import { CloseIcon, EditIcon, GripIcon, LockIcon, MoreIcon, PlusIcon, TrashIcon } from "./Icons";
+import { CloseIcon, EditIcon, GripIcon, MoreIcon, PlusIcon, TrashIcon } from "./Icons";
 
 type Projects = ReturnType<typeof useProjects>;
 type View = { x: number; y: number; z: number };
@@ -308,22 +308,17 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
                 {s.sections.map((sec, i) => sec.type === "sources" ? (
                   // The Project Dump: always there, so it's shown apart, not as a section to edit.
                   <li key={sec.key ?? i} className="np-dump">
-                    <span className="np-lock" aria-hidden="true"><LockIcon /></span>
                     <span className="np-dump-name">{names.projectDump}</span>
                     <span className="np-dump-text">This project&apos;s own links, notes, and files</span>
                   </li>
                 ) : (
                   <li key={sec.key ?? i} className={dragging === i ? "lifted" : ""}>
                     <span className="np-grip" aria-label="Drag to reorder" onPointerDown={startMove(i)}><GripIcon /></span>
-                    {sec.type === "sources" ? <span className="np-type">{names.projectDump}</span> : (
-                      <select className="np-type" value={sec.type} aria-label="Section type" onChange={(e) => setSection(i, { type: e.target.value })}>
-                        {TYPES.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
-                      </select>
-                    )}
+                    <select className="np-type" value={sec.type} aria-label="Section type" onChange={(e) => setSection(i, { type: e.target.value })}>
+                      {TYPES.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
+                    </select>
                     <input value={sec.title} aria-label="Section name" onChange={(e) => setSection(i, { title: e.target.value })} />
-                    {sec.type === "sources"
-                      ? <span className="np-lock" aria-label={`Every project has a ${names.projectDump}`} data-tip={`Every project has a ${names.projectDump}`}><LockIcon /></span>
-                      : <button aria-label={`Remove ${sec.title}`} onClick={() => setS({ ...s, sections: s.sections.filter((_, j) => j !== i) })}><CloseIcon /></button>}
+                    <button aria-label={`Remove ${sec.title}`} onClick={() => setS({ ...s, sections: s.sections.filter((_, j) => j !== i) })}><CloseIcon /></button>
                   </li>
                 ))}
               </ul>

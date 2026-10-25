@@ -26,7 +26,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     data.sortedBy = "user";
   }
   if (typeof body.archived === "boolean") data.archived = body.archived;
-  if (typeof body.done === "boolean") data.done = body.done;
+  if (typeof body.done === "boolean") { data.done = body.done; data.doneAt = body.done ? new Date() : null; }
   Object.assign(data, dueFields(body));
   // Link to a project, or unlink with null. The item keeps its category.
   if (body.projectId === null || typeof body.projectId === "string") data.projectId = body.projectId;

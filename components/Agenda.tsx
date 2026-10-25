@@ -4,16 +4,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DuePicker, isLate, type Due } from "./Due";
 import { CheckIcon, PlusIcon } from "./Icons";
 
-type Entry = Due & { kind: "item" | "task"; id: string; text: string; color: string | null; project: { id: string; title: string; color: string | null } | null };
+type Entry = Due & { kind: "item" | "task"; id: string; text: string; color: string | null; done: boolean; project: { id: string; title: string; color: string | null } | null };
 
 const day = (offset: number) => { const d = new Date(); d.setDate(d.getDate() + offset); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+// The last few things checked off go in Done, at the bottom, where they can be unchecked.
 const GROUPS: { name: string; test: (e: Entry) => boolean }[] = [
   { name: "Late", test: (e) => isLate(e) },
   { name: "Today", test: (e) => e.dueDate === day(0) },
   { name: "Tomorrow", test: (e) => e.dueDate === day(1) },
   { name: "Later", test: (e) => !!e.dueDate && e.dueDate > day(1) },
   { name: "No date", test: (e) => !e.dueDate },
+  { name: "Done", test: (e) => e.done },
 ];
+const groupOf = (e: Entry) => (e.done ? GROUPS.length - 1 : GROUPS.findIndex((g) => g.test(e)));
 
 const NONE: Due = { dueDate: null, dueTime: null, priority: null };
 const send = (url: string, method: string, body: object) =>
@@ -39,10 +42,16 @@ export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
     return () => clearInterval(t);
   }, [load]);
   const url = (e: Entry) => `/api/${e.kind === "item" ? "items" : "tasks"}/${e.id}`;
+  // Checking moves a row to the top of Done; unchecking puts it back with the others.
   const check = (e: Entry) => {
     seq.current++;
-    setList((l) => l?.filter((x) => x.id !== e.id) ?? l);
-    send(url(e), "PATCH", { done: true });
+    setList((l) => {
+      if (!l) return l;
+      const rest = l.filter((x) => x.id !== e.id);
+      const moved = { ...e, done: !e.done };
+      return moved.done ? [...rest.filter((x) => !x.done), moved, ...rest.filter((x) => x.done)] : [moved, ...rest];
+    });
+    send(url(e), "PATCH", { done: !e.done }).then(load);
   };
   const change = (e: Entry, d: Partial<Due>) => {
     seq.current++;
@@ -70,12 +79,12 @@ export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
       {/* One list with the group headings in it, so a row keeps its open date menu when a new date moves it to another group. */}
       <ul>
         {GROUPS.flatMap((g, gi) => {
-          const rows = list.filter((e) => GROUPS.findIndex((x) => x.test(e)) === gi);
+          const rows = list.filter((e) => groupOf(e) === gi);
           return rows.length ? [
             <li key={`group-${g.name}`} className="pick-head">{g.name}</li>,
             ...rows.map((e) => (
-              <li key={e.id}>
-                <button className="check" aria-label="Mark done" onClick={() => check(e)}><CheckIcon /></button>
+              <li key={e.id} className={e.done ? "done" : ""}>
+                <button className="check" aria-label={e.done ? "Mark not done" : "Mark done"} aria-pressed={e.done} onClick={() => check(e)}><CheckIcon /></button>
                 <div className="agenda-body">
                   {e.kind === "item" ? <button className="agenda-text" onClick={() => onOpen(e.id)}>{e.text}</button>
                     : <Link className="agenda-text" href={`/p/${e.project?.id}`}>{e.text}</Link>}
