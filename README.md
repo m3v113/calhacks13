@@ -106,7 +106,7 @@ Hover over any icon to see what it does.
 - **Inside a project:**
   - **Writing** sections have formatting (bold, italic, headings, lists) in a small bar that shows while you type. ⌘B and ⌘I work too.
   - **Tasks:** check off, reword, and add.
-  - **Auto steps:** after you create an Auto project, the AI works out the steps (this can take a minute). Each step has an explanation and subtasks, and there's always a Troubleshooting step. Click ✓ to keep a step or × to drop it, or **Keep all**. Add your own sections with **+ Section**.
+  - **Auto projects:** after you create one, the AI lays it out in sections (this can take a minute): short explanations, key points, facts, and checklists, including what to do if something goes wrong. Delete any section you don't need with its trash icon, and add your own with **+ Section**.
   - **Sources:** paste a link, write a note, or upload a file. It's added to the inbox too. **From inbox** searches the inbox, filters by category, and groups results by category. × takes a source out of the project (it stays in the inbox).
   - **Arranging:** drag a section by the handle in its header onto another section's edge. Left or right puts them side by side, and top or bottom stacks them. ↔ switches a section between half and full width.
   - **Scouts** (on the left) do one job when you press **Run**. Click **+**, write what you need, and check the kind (it's guessed from your words):

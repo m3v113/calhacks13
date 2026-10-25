@@ -110,16 +110,6 @@ export default function ProjectSpace({ id }: { id: string }) {
     if (!confirm(`Delete "${project.title}"? Its sources stay in the inbox.`)) return;
     api(`/api/projects/${id}`, "DELETE").then(() => router.push("/"));
   };
-  // Sections the AI made for an Auto project wait for you to keep or drop them.
-  const keep = (ids: string[]) => {
-    setProject((p) => (p ? { ...p, sections: p.sections.map((s) => (ids.includes(s.id) ? { ...s, proposed: false } : s)) } : p));
-    for (const sid of ids) api(`/api/sections/${sid}`, "PATCH", { proposed: false });
-  };
-  const drop = (s: Section) => {
-    update({ sections: project.sections.filter((x) => x.id !== s.id) });
-    api(`/api/sections/${s.id}`, "DELETE");
-  };
-  const proposed = project.sections.filter((s) => s.proposed);
   const toScout = (brief: string) => setScoutDraft((d) => ({ brief, n: (d?.n ?? 0) + 1 }));
 
   // Drop a section on the edge of another: left or right puts them side by side, top or bottom stacks them.
@@ -205,15 +195,9 @@ export default function ProjectSpace({ id }: { id: string }) {
               <div className="pending-lines" aria-label="Writing the steps"><span /><span /><span /><em>Working out the steps…</em></div>
             </section>
           )}
-          {proposed.length > 1 && (
-            <div className="keep-bar wide">
-              <span>The AI suggested {proposed.length} sections. Keep the ones you want.</span>
-              <button onClick={() => keep(proposed.map((s) => s.id))}>Keep all</button>
-            </div>
-          )}
           {project.sections.map((s) => (
             <section key={s.id} data-section={s.id}
-              className={`section ${s.span === 2 ? "wide" : ""} ${s.proposed ? "proposed" : ""} ${moving?.id === s.id ? "lifted" : ""} ${target?.id === s.id ? `drop-${target.side}` : ""}`}
+              className={`section ${s.span === 2 ? "wide" : ""} ${moving?.id === s.id ? "lifted" : ""} ${target?.id === s.id ? `drop-${target.side}` : ""}`}
               style={moving?.id === s.id ? { transform: `translate(${moving.dx}px, ${moving.dy}px)` } : undefined}
             >
               <div className="section-top" onPointerDown={startMove(s.id)}>
@@ -221,13 +205,7 @@ export default function ProjectSpace({ id }: { id: string }) {
                 <Line className="section-title" label="Section name" value={s.title} onSave={(title) => patchSection(s.id, { title })} />
                 <button className="icon small fade" aria-label={s.span === 2 ? "Half width" : "Full width"} data-tip={s.span === 2 ? "Half width" : "Full width"}
                   onClick={() => patchSection(s.id, { span: s.span === 2 ? 1 : 2 })}><WidthIcon /></button>
-                {s.proposed && (
-                  <>
-                    <button className="icon small keep" aria-label={`Keep ${s.title}`} data-tip="Keep" onClick={() => keep([s.id])}><CheckIcon /></button>
-                    <button className="icon small" aria-label={`Drop ${s.title}`} data-tip="Drop" onClick={() => drop(s)}><CloseIcon /></button>
-                  </>
-                )}
-                {s.type !== "sources" && !s.proposed && (
+                {s.type !== "sources" && (
                   <button className="icon small fade" aria-label={`Delete ${s.title}`} data-tip="Delete section" onClick={() => removeSection(s)}><TrashIcon /></button>
                 )}
               </div>
@@ -278,26 +256,20 @@ function Tasks({ section, setSection, planning, onScout }: {
     const r = await api(`/api/sections/${section.id}/tasks`, "POST", { text: t });
     if (r.ok) { const task = await r.json(); setSection(section.id, (s) => ({ ...s, tasks: [...s.tasks, task] })); }
   };
-  const proposed = section.tasks.filter((t) => t.proposed);
   return (
     <ul className="tasks">
       {section.tasks.map((t) => (
-        <li key={t.id} className={`${t.done ? "done" : ""} ${t.proposed ? "proposed" : ""}`}>
-          {t.proposed
-            ? <button className="check keep" aria-label="Keep this step" data-tip="Keep" onClick={() => change(t.id, { proposed: false })}><CheckIcon /></button>
-            : <button className="check" aria-label={t.done ? "Mark not done" : "Mark done"} aria-pressed={t.done} onClick={() => change(t.id, { done: !t.done })}>{t.done && <CheckIcon />}</button>}
+        <li key={t.id} className={t.done ? "done" : ""}>
+          <button className="check" aria-label={t.done ? "Mark not done" : "Mark done"} aria-pressed={t.done} onClick={() => change(t.id, { done: !t.done })}>{t.done && <CheckIcon />}</button>
           <div className="task-body">
             <Line wrap className="task-text" label="Task" value={t.text} onSave={(text) => change(t.id, { text })} />
             {t.detail && <div className="task-detail">{t.detail}</div>}
           </div>
-          {!t.proposed && <button className="icon small fade" aria-label="Send to Scouts" data-tip="Send to Scouts" onClick={() => onScout(t.text)}><ScoutIcon /></button>}
-          <button className={`icon small ${t.proposed ? "" : "fade"}`} aria-label={t.proposed ? "Remove this step" : "Delete task"} onClick={() => remove(t.id)}><CloseIcon /></button>
+          <button className="icon small fade" aria-label="Send to Scouts" data-tip="Send to Scouts" onClick={() => onScout(t.text)}><ScoutIcon /></button>
+          <button className="icon small fade" aria-label="Delete task" onClick={() => remove(t.id)}><CloseIcon /></button>
         </li>
       ))}
       {planning && <li className="pending-lines" aria-label="Writing steps"><span /><span /><span /></li>}
-      {proposed.length > 1 && (
-        <li><button className="keep-all" onClick={() => proposed.forEach((t) => change(t.id, { proposed: false }))}>Keep all {proposed.length}</button></li>
-      )}
       <li className="add-task">
         <PlusIcon />
         <input value={text} placeholder="Add a task" aria-label="Add a task" onChange={(e) => setText(e.target.value)}

@@ -193,7 +193,7 @@ async function planContext(id: string) {
   ].filter(Boolean).join("\n\n").slice(0, 9000);
 }
 
-// Auto projects: the AI writes the sections, each in the shape that fits it. They show as proposed until you keep them.
+// Auto projects: the AI writes the sections, each in the shape that fits it. You delete the ones you don't want.
 async function planAuto(id: string) {
   if (running.has(id)) return;
   running.add(id);
@@ -211,7 +211,7 @@ async function planAuto(id: string) {
     for (const [order, s] of sections.entries()) {
       await db.section.create({
         data: {
-          projectId: id, type: s.type, title: s.title, order, span: 1, proposed: true, notes: s.notes,
+          projectId: id, type: s.type, title: s.title, order, span: 1, notes: s.notes,
           tasks: { create: s.tasks.map((text, i) => ({ text, order: i })) },
         },
       });
@@ -233,6 +233,9 @@ export async function upgradeSections() {
   await db.section.updateMany({ where: { type: "notes" }, data: { type: "writing" } });
   await db.section.updateMany({ where: { type: "items" }, data: { type: "sources" } });
   await db.section.deleteMany({ where: { type: "providers" } });
+  // AI sections used to wait for you to keep them. Now they're just there.
+  await db.section.updateMany({ where: { proposed: true }, data: { proposed: false } });
+  await db.task.updateMany({ where: { proposed: true }, data: { proposed: false } });
   const missing = await db.project.findMany({ where: { sections: { none: { type: "sources" } } }, select: { id: true } });
   for (const { id } of missing) {
     const last = await db.section.findFirst({ where: { projectId: id }, orderBy: { order: "desc" }, select: { order: true } });
