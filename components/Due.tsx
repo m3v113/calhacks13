@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { PRIORITIES } from "@/lib/due";
+import { PRIORITIES, parseDate, parseTime } from "@/lib/due";
 import { useDismiss } from "./Projects";
 import { CalendarIcon } from "./Icons";
 
@@ -9,6 +9,11 @@ export type Due = { dueDate: string | null; dueTime: string | null; priority: nu
 const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const addDays = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 export const isLate = (d: Due) => !!d.dueDate && d.dueDate < today();
+
+const timeName = (t: string) => new Date(`2000-01-01T${t}`).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+// "Oct 27", or "Tuesday, Oct 27" in full.
+const dayName = (iso: string, full = false) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { ...(full ? { weekday: "long" } : {}), month: "short", day: "numeric" });
 
 // "Today 5 PM", "Tomorrow", "Oct 28".
 export function dueLabel(d: Due) {
@@ -37,7 +42,7 @@ export function DueChip({ due }: { due: Due }) {
 export function DuePicker({ due, onChange, className, icon }: { due: Due; onChange: (d: Due) => void; className?: string; icon?: boolean }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Due>(due);
-  const ref = useDismiss<HTMLSpanElement>(open, () => setOpen(false));
+  const ref = useDismiss<HTMLSpanElement>(open, () => close());
   const shown = open ? draft : due;
   const set = dueLabel(shown) || shown.priority;
   const pick = (d: Partial<Due>) => {
@@ -46,25 +51,44 @@ export function DuePicker({ due, onChange, className, icon }: { due: Due; onChan
     setDraft(next);
     onChange(next);
   };
-  // Typed dates and times are read again when you leave the field, in case the browser didn't report the change.
-  const read = (e: React.SyntheticEvent<HTMLInputElement>, key: "dueDate" | "dueTime") => pick({ [key]: e.currentTarget.value || null });
+  // The date ("fri", "10/27", "oct 27") and time ("5pm", "17:30") are typed and saved when the menu closes (Enter, or a
+  // click outside), so the row doesn't jump to another group while you type. An empty box clears its part; one that
+  // can't be read leaves it as it was.
+  const [typed, setTyped] = useState("");
+  const [typedTime, setTypedTime] = useState("");
+  const parsed = parseDate(typed);
+  const parsedTime = parseTime(typedTime);
+  const close = () => {
+    const d: Partial<Due> = {};
+    if (parsed || !typed.trim()) d.dueDate = parsed;
+    if (parsedTime || !typedTime.trim()) d.dueTime = parsedTime;
+    pick(d);
+    setOpen(false);
+  };
   return (
     <span className={`due-pick ${className ?? ""}`} ref={ref}>
       <button className={set && !icon ? "due-btn" : `icon small ${set && !icon ? "" : "fade"}`} aria-label="Date and priority" data-tip={set && !icon ? undefined : "Date and priority"}
-        aria-expanded={open} onClick={() => { if (!open) setDraft({ dueDate: due.dueDate, dueTime: due.dueTime, priority: due.priority }); setOpen(!open); }}>
+        aria-expanded={open} onClick={() => {
+          if (!open) { setDraft({ dueDate: due.dueDate, dueTime: due.dueTime, priority: due.priority }); setTyped(due.dueDate ? dayName(due.dueDate) : ""); setTypedTime(due.dueTime ? timeName(due.dueTime) : ""); }
+          if (open) close(); else setOpen(true);
+        }}>
         {set && !icon ? <DueChip due={shown} /> : <CalendarIcon />}
       </button>
       {open && (
         <div className="menu due-menu">
-          <input type="date" aria-label="Date" value={draft.dueDate ?? ""} onChange={(e) => read(e, "dueDate")} onBlur={(e) => read(e, "dueDate")} />
-          <input type="time" aria-label="Time" value={draft.dueTime ?? ""} onChange={(e) => read(e, "dueTime")} onBlur={(e) => read(e, "dueTime")} />
+          <input autoFocus value={typed} placeholder="Date: fri, 10/27, oct 27" aria-label="Date" onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") close(); }} />
+          {typed.trim() && <span className={`due-read ${parsed ? "" : "bad"}`}>{parsed ? dayName(parsed, true) : "Try fri, 10/27, or oct 27"}</span>}
+          <input value={typedTime} placeholder="Time: 5pm, 9:30am" aria-label="Time" onChange={(e) => setTypedTime(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") close(); }} />
+          {typedTime.trim() && <span className={`due-read ${parsedTime ? "" : "bad"}`}>{parsedTime ? timeName(parsedTime) : "Try 5pm or 17:30"}</span>}
           <div className="due-prios" role="radiogroup" aria-label="Priority">
             {PRIORITIES.map((p) => (
               <button key={p.n} role="radio" aria-checked={draft.priority === p.n} className={draft.priority === p.n ? "on" : ""}
                 onClick={() => pick({ priority: draft.priority === p.n ? null : p.n })}><span className={`prio p${p.n}`} />{p.label}</button>
             ))}
           </div>
-          {set && <button className="due-clear" onClick={() => { pick({ dueDate: null, dueTime: null, priority: null }); setOpen(false); }}>Clear</button>}
+          {set && <button className="due-clear" onClick={() => { pick({ dueDate: null, dueTime: null, priority: null }); setTyped(""); setTypedTime(""); setOpen(false); }}>Clear</button>}
         </div>
       )}
     </span>

@@ -64,6 +64,13 @@ Ordered. Feature numbers match the plan.
 
 ## Log
 
+### 2026-10-25 · Typed dates and times, new projects stay on the Hub (PR #11)
+
+- **The date is typed now**, because the browser's date field kept losing what Mehvish picked. `parseDate` in `lib/due.ts` reads "today", "tomorrow", weekdays ("fri", "next mon"), "in 3 days", "2w", "10/27", "10/27/2026", "oct 27", "27 oct", and "2026-10-27". A date without a year is the next one to come. The line under the box shows the day it read, or a hint when it can't read it. It's saved when the menu closes (Enter, a click outside, or Escape), so the row doesn't jump to another group while you type.
+- **Time is typed too** (`parseTime`): "5pm", "5:30 pm", "9a", "17:30", "1730", "noon", "midnight". A bare hour from 1 to 6 means afternoon, 7 to 11 morning. It's saved with the date when the menu closes. (A half-hour list came first; Mehvish preferred typing.)
+- **New projects stay on the Hub:** Create adds the card and closes the box, instead of opening the project.
+- **Tasks list:** the groups are now headings inside one list, so a row keeps its open menu when it moves to another group.
+
 ### 2026-10-25 · Round 8: the app is Oven, the Brain Dump is the Pantry (PR #10)
 
 - Mehvish renamed the app to **Oven** and the Brain Dump to **Pantry**. Both names live in `lib/names.ts`, so the UI, page titles, and tooltips follow. The package is `oven`, and the README, `CLAUDE.md`, `.env.example`, and code comments use the new names. Entries below this one keep the names used at the time.

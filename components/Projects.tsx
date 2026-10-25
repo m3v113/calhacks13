@@ -219,7 +219,6 @@ const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "T
 // "+" on the Hub: one sentence → a suggested name and kind → for a Space, its sections (reorder, rename,
 // retype, add); for Auto, what the AI should start from → create.
 export function NewProject({ projects, inbox, at }: { projects: Projects; inbox: ReturnType<typeof useInbox>; at: () => { x: number; y: number } }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [goal, setGoal] = useState("");
   const [busy, setBusy] = useState(false);
@@ -250,9 +249,9 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
     if (!s || !s.title.trim() || busy) return;
     setBusy(true);
     const { x, y } = at();
-    const p = await projects.create(goal.trim(), s, x, y, { context, itemIds: picked.map((i) => i.id) });
+    // The new card shows up on the Hub; you stay here and open it when you want.
+    await projects.create(goal.trim(), s, x, y, { context, itemIds: picked.map((i) => i.id) });
     reset();
-    if (p) router.push(`/p/${p.id}`);
   };
   const setSection = (i: number, c: Partial<Suggestion["sections"][number]>) =>
     s && setS({ ...s, sections: s.sections.map((x, j) => (j === i ? { ...x, ...c } : x)) });
