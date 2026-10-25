@@ -71,6 +71,7 @@ Ordered. Feature numbers match the plan.
 - An item is still in one project at a time (`Item.projectId`). **From Pantry** in a project and in the New project box only offers Unsorted items, so picking one never pulls it out of another project. × in a Project Dump takes it out of the project only; deleting a project leaves its items in the Pantry as Unsorted.
 - Category counts in the sidebar now count project items too.
 - **Space and Auto are now Manual and Assisted** (Mehvish's pick). Only the names changed: `lib/names.ts` has them, and the stored kind is still `space` or `auto`.
+- **README rewritten** around Mehvish's Devpost write-up: setup, settings, and troubleshooting first (shortened), then Inspiration through What's next, then a short file map. The long how-to-use guide is gone; the app is meant to be clear without it.
 
 ### 2026-10-25 · Done group in Tasks, no lock icon (PR #12)
 
