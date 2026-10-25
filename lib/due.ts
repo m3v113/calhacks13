@@ -53,5 +53,24 @@ export function parseDate(text: string, now = new Date()): string | null {
   return null;
 }
 
-// Times to pick from: every half hour, "HH:MM".
-export const TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
+// A typed time, as "HH:MM": "5pm", "5:30 pm", "9a", "17:30", "1730", "noon", "midnight". A bare hour from 1 to 6
+// is in the afternoon, 7 to 11 in the morning. Null when it can't be read.
+export function parseTime(text: string): string | null {
+  const t = text.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+  if (t === "noon") return "12:00";
+  if (t === "midnight") return "00:00";
+  const m = t.match(/^(\d{1,2})(?::?(\d{2}))? ?(am|pm|a|p)?$/);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = Number(m[2] ?? 0);
+  if (min > 59) return null;
+  if (m[3]) {
+    if (h < 1 || h > 12) return null;
+    const pm = m[3].startsWith("p");
+    h = (h % 12) + (pm ? 12 : 0);
+  } else if (!m[2] || m[1].length === 1) {
+    if (h < 1 || h > 23) return null;
+    if (h <= 6) h += 12;
+  } else if (h > 23) return null;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
