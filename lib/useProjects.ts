@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 export type Kind = "space" | "auto";
 export type ProjectCard = { id: string; title: string; color: string | null; kind: Kind; canvasX: number; canvasY: number; cardW: number; cardH: number };
 export type Line = { id: string; fromId: string; toId: string; color: string | null };
-export type SectionDraft = { type: string; title: string };
+export type SectionDraft = { type: string; title: string; key?: string }; // key: only for lists on screen
 export type Suggestion = { title: string; kind: Kind; sections: SectionDraft[]; by: "ai" | "template" };
 
 const json = (body: object) => ({ headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -32,8 +32,10 @@ export function useProjects() {
     return r.ok ? r.json() : null;
   }, []);
 
-  const create = useCallback(async (goal: string, s: Suggestion, x: number, y: number) => {
-    const r = await fetch("/api/projects", { method: "POST", ...json({ goal, title: s.title, kind: s.kind, sections: s.sections, x, y }) });
+  // Auto projects send what the AI should start from instead of sections.
+  const create = useCallback(async (goal: string, s: Suggestion, x: number, y: number, start?: { context: string; itemIds: string[] }) => {
+    const body = s.kind === "auto" ? { goal, title: s.title, kind: s.kind, x, y, ...start } : { goal, title: s.title, kind: s.kind, sections: s.sections, x, y };
+    const r = await fetch("/api/projects", { method: "POST", ...json(body) });
     if (r.ok) { const p = await r.json(); setProjects((ps) => [...ps, p]); return p as ProjectCard; }
     return null;
   }, []);
@@ -45,6 +47,12 @@ export function useProjects() {
   const save = useCallback((id: string, c: Partial<ProjectCard>) => {
     setProjects((ps) => ps.map((p) => (p.id === id ? { ...p, ...c } : p)));
     fetch(`/api/projects/${id}`, { method: "PATCH", ...json(c) });
+  }, []);
+
+  const remove = useCallback((id: string) => {
+    setProjects((ps) => ps.filter((p) => p.id !== id));
+    setLines((ls) => ls.filter((l) => l.fromId !== id && l.toId !== id));
+    fetch(`/api/projects/${id}`, { method: "DELETE" });
   }, []);
 
   // Add an inbox item to a project's sources.
@@ -66,5 +74,5 @@ export function useProjects() {
     fetch(`/api/links/${id}`, { method: "DELETE" });
   }, []);
 
-  return { projects, lines, load, suggest, create, change, save, link, connect, recolorLine, removeLine };
+  return { projects, lines, load, suggest, create, change, save, remove, link, connect, recolorLine, removeLine };
 }

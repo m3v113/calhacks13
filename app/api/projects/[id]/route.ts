@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { COLORS } from "@/lib/colors";
-import { planning, queuePlan, upgradeSections } from "@/lib/projects";
+import { planning, upgradeSections } from "@/lib/projects";
 
 type Ctx = { params: Promise<{ id: string }> };
 const ITEM = { where: { archived: false }, orderBy: { createdAt: "desc" as const }, omit: { extracted: true } };
@@ -27,15 +27,14 @@ export async function GET(_req: Request, { params }: Ctx) {
   return NextResponse.json({ ...rest, linked, planning: planning.has(id) });
 }
 
-// Edit a project: title, color, kind, position and size on the Hub.
-// { order: [sectionId, ...] } reorders its sections; { plan: true } asks the AI for steps again.
+// Edit a project: title, color, position and size on the Hub. Its kind is set when it's made.
+// { order: [sectionId, ...] } reorders its sections.
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const data: Record<string, unknown> = {};
   if (typeof body.title === "string" && body.title.trim()) data.title = body.title.trim().slice(0, 60);
   if (typeof body.color === "string" && COLORS.includes(body.color)) data.color = body.color;
-  if (body.kind === "space" || body.kind === "auto") data.kind = body.kind;
   for (const k of ["canvasX", "canvasY"]) if (Number.isFinite(body[k])) data[k] = body[k];
   if (Number.isFinite(body.cardW)) data.cardW = Math.min(800, Math.max(180, body.cardW));
   if (Number.isFinite(body.cardH)) data.cardH = Math.min(600, Math.max(72, body.cardH));
@@ -45,8 +44,6 @@ export async function PATCH(req: Request, { params }: Ctx) {
       await db.$transaction(body.order.filter((s: unknown) => typeof s === "string").map((sid: string, order: number) =>
         db.section.updateMany({ where: { id: sid, projectId: id }, data: { order } })));
     }
-    if (body.plan === true) queuePlan(id, true);
-    else if (data.kind === "auto" && !(await db.task.count({ where: { section: { projectId: id } } }))) queuePlan(id);
     return NextResponse.json(project);
   } catch {
     return NextResponse.json({ error: "not found" }, { status: 404 });

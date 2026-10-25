@@ -61,6 +61,7 @@ model Project {
   cardW      Float    @default(260) // card size on the Hub
   cardH      Float    @default(120)
   kind       String   @default("space") // "space" (you work in it) | "auto" (the AI breaks it into steps)
+  context    String? // what you gave the AI to start an Auto project from
   overview   String? // no longer shown; kept so existing databases update without data loss
   overviewBy String?
   createdAt  DateTime @default(now())
@@ -90,7 +91,8 @@ model Section {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  type      String // "writing" | "tasks" | "sources" (older databases: "notes", "items", "providers")
+  type      String // "writing" | "tasks" | "sources" | "step" (Auto: explanation + subtasks); older: "notes", "items", "providers"
+  proposed  Boolean  @default(false) // made by the AI and not yet kept
   title     String
   order     Int      @default(0)
   span      Int      @default(1) // 1 = half width, 2 = full width

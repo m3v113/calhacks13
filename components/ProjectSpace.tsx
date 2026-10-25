@@ -7,12 +7,12 @@ import type { Kind } from "@/lib/useProjects";
 import ItemView from "./ItemView";
 import Writing from "./Writing";
 import Swatches from "./Swatches";
-import { KindSwitch, useDismiss } from "./Projects";
-import { fromUrl } from "./Inbox";
-import { BackIcon, CheckIcon, CloseIcon, PlusIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
+import { useDismiss } from "./Projects";
+import InboxPicker, { itemName } from "./InboxPicker";
+import { BackIcon, CheckIcon, CloseIcon, GripIcon, PlusIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
 
 type Task = { id: string; text: string; detail: string | null; proposed: boolean; done: boolean };
-type Section = { id: string; type: string; title: string; span: number; notes: string | null; tasks: Task[] };
+type Section = { id: string; type: string; title: string; span: number; notes: string | null; proposed: boolean; tasks: Task[] };
 type Linked = { id: string; title: string; color: string | null; items: Item[] };
 type Project = {
   id: string; title: string; goal: string | null; color: string | null; kind: Kind; planning: boolean;
@@ -26,7 +26,6 @@ const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "T
 const api = (url: string, method: string, body?: object) =>
   fetch(url, { method, headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
 
-const itemName = (i: Item) => i.title ?? i.fileName ?? (i.url && fromUrl(i.url)) ?? i.url ?? i.text;
 
 // A one-line input that saves when you press Enter or leave it.
 function Line({ value, onSave, className, label }: { value: string; onSave: (v: string) => void; className?: string; label: string }) {
@@ -61,7 +60,7 @@ export default function ProjectSpace({ id }: { id: string }) {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (project) document.title = project.title; }, [project?.title]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // While the AI writes the steps of an Auto project, check back every few seconds.
+  // While the AI builds an Auto project, check back every few seconds.
   const planning = !!project?.planning;
   useEffect(() => {
     if (!planning) return;
@@ -104,10 +103,16 @@ export default function ProjectSpace({ id }: { id: string }) {
     if (!confirm(`Delete "${project.title}"? Its sources stay in the inbox.`)) return;
     api(`/api/projects/${id}`, "DELETE").then(() => router.push("/"));
   };
-  const setKind = (kind: Kind) => {
-    update({ kind });
-    save({ kind }).then(() => { if (kind === "auto") load(); });
+  // Sections the AI made for an Auto project wait for you to keep or drop them.
+  const keep = (ids: string[]) => {
+    setProject((p) => (p ? { ...p, sections: p.sections.map((s) => (ids.includes(s.id) ? { ...s, proposed: false } : s)) } : p));
+    for (const sid of ids) api(`/api/sections/${sid}`, "PATCH", { proposed: false });
   };
+  const drop = (s: Section) => {
+    update({ sections: project.sections.filter((x) => x.id !== s.id) });
+    api(`/api/sections/${s.id}`, "DELETE");
+  };
+  const proposed = project.sections.filter((s) => s.proposed);
 
   // Drop a section on the edge of another: left or right puts them side by side, top or bottom stacks them.
   const place = (from: string, to: string, side: Side) => {
@@ -178,7 +183,6 @@ export default function ProjectSpace({ id }: { id: string }) {
           )}
         </div>
         <Line className="space-title" label="Project name" value={project.title} onSave={(title) => { update({ title }); save({ title }); }} />
-        <KindSwitch value={project.kind} onChange={setKind} />
         <button className="icon" aria-label="Delete project" data-tip="Delete project" onClick={remove}><TrashIcon /></button>
       </header>
 
@@ -189,20 +193,44 @@ export default function ProjectSpace({ id }: { id: string }) {
         </aside>
 
         <main className="sections" ref={grid}>
+          {planning && (
+            <section className="section wide planning">
+              <div className="pending-lines" aria-label="Writing the steps"><span /><span /><span /><em>Working out the steps…</em></div>
+            </section>
+          )}
+          {proposed.length > 1 && (
+            <div className="keep-bar wide">
+              <span>The AI suggested {proposed.length} sections. Keep the ones you want.</span>
+              <button onClick={() => keep(proposed.map((s) => s.id))}>Keep all</button>
+            </div>
+          )}
           {project.sections.map((s) => (
             <section key={s.id} data-section={s.id}
-              className={`section ${s.span === 2 ? "wide" : ""} ${moving?.id === s.id ? "lifted" : ""} ${target?.id === s.id ? `drop-${target.side}` : ""}`}
+              className={`section ${s.span === 2 ? "wide" : ""} ${s.proposed ? "proposed" : ""} ${moving?.id === s.id ? "lifted" : ""} ${target?.id === s.id ? `drop-${target.side}` : ""}`}
               style={moving?.id === s.id ? { transform: `translate(${moving.dx}px, ${moving.dy}px)` } : undefined}
             >
               <div className="section-top" onPointerDown={startMove(s.id)}>
+                <span className="grip" aria-hidden="true"><GripIcon /></span>
                 <Line className="section-title" label="Section name" value={s.title} onSave={(title) => patchSection(s.id, { title })} />
                 <button className="icon small fade" aria-label={s.span === 2 ? "Half width" : "Full width"} data-tip={s.span === 2 ? "Half width" : "Full width"}
                   onClick={() => patchSection(s.id, { span: s.span === 2 ? 1 : 2 })}><WidthIcon /></button>
-                {s.type !== "sources" && (
+                {s.proposed && (
+                  <>
+                    <button className="icon small keep" aria-label={`Keep ${s.title}`} data-tip="Keep" onClick={() => keep([s.id])}><CheckIcon /></button>
+                    <button className="icon small" aria-label={`Drop ${s.title}`} data-tip="Drop" onClick={() => drop(s)}><CloseIcon /></button>
+                  </>
+                )}
+                {s.type !== "sources" && !s.proposed && (
                   <button className="icon small fade" aria-label={`Delete ${s.title}`} data-tip="Delete section" onClick={() => removeSection(s)}><TrashIcon /></button>
                 )}
               </div>
               {s.type === "tasks" && <Tasks section={s} setSection={setSection} planning={planning && s.id === project.sections.find((x) => x.type === "tasks")?.id} />}
+              {s.type === "step" && (
+                <>
+                  <Writing label={`${s.title}: how to`} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />
+                  <Tasks section={s} setSection={setSection} planning={false} />
+                </>
+              )}
               {s.type === "writing" && <Writing label={s.title} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />}
               {s.type === "sources" && <Sources project={project} inbox={inbox} reload={load} onOpen={setViewing} update={update} />}
             </section>
@@ -286,11 +314,9 @@ function Sources({ project, inbox, reload, onOpen, update }: {
 }) {
   const [text, setText] = useState("");
   const [picking, setPicking] = useState(false);
-  const [q, setQ] = useState("");
-  const [cat, setCat] = useState<string | null>(null);
   const [up, setUp] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
-  const ref = useDismiss<HTMLDivElement>(picking, () => { setPicking(false); setQ(""); setCat(null); });
+  const ref = useDismiss<HTMLDivElement>(picking, () => setPicking(false));
   const color = new Map(inbox.categories.map((c) => [c.id, c.color]));
   const mine = new Set(project.items.map((i) => i.id));
 
@@ -327,11 +353,6 @@ function Sources({ project, inbox, reload, onOpen, update }: {
     api(`/api/items/${itemId}`, "PATCH", { projectId: null }).then(inbox.refresh);
   };
 
-  const needle = q.trim().toLowerCase();
-  const choices = inbox.items.filter((i) => !mine.has(i.id) && !i.id.startsWith("tmp-") && (!cat || i.categoryId === cat)
-    && (!needle || [i.title, i.text, i.fileName, i.url].join(" ").toLowerCase().includes(needle)));
-  const groups = inbox.categories.map((c) => ({ c, items: choices.filter((i) => i.categoryId === c.id) })).filter((g) => g.items.length);
-
   return (
     <>
       <ul className="linked">
@@ -357,31 +378,7 @@ function Sources({ project, inbox, reload, onOpen, update }: {
         <div className="add-linked" ref={ref}>
           <button className="from-inbox" aria-expanded={picking}
             onClick={(e) => { setUp(e.currentTarget.getBoundingClientRect().bottom + 400 > window.innerHeight); setPicking(!picking); }}>From inbox</button>
-          {picking && (
-            <div className={`menu pick-items ${up ? "up" : ""}`}>
-              <input autoFocus value={q} placeholder="Search" aria-label="Search the inbox" onChange={(e) => setQ(e.target.value)} />
-              <div className="pick-cats">
-                <button className={cat === null ? "on" : ""} onClick={() => setCat(null)}>All</button>
-                {inbox.categories.filter((c) => c.count > 0).map((c) => (
-                  <button key={c.id} className={cat === c.id ? "on" : ""} onClick={() => setCat(cat === c.id ? null : c.id)}>
-                    <span className="dot" style={{ background: c.color }} />{c.name}
-                  </button>
-                ))}
-              </div>
-              {groups.map(({ c, items }) => (
-                <div key={c.id} className="pick-group">
-                  <div className="pick-head">{c.name}</div>
-                  {items.map((i) => (
-                    <button key={i.id} onClick={() => link(i)}>
-                      <span className="dot" style={{ background: c.color }} />
-                      <span className="name">{itemName(i)}</span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-              {!groups.length && <p className="muted pick-none">Nothing found</p>}
-            </div>
-          )}
+          {picking && <InboxPicker inbox={inbox} up={up} exclude={mine} onPick={(i) => link(i)} />}
         </div>
       </div>
     </>

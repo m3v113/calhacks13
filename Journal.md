@@ -8,7 +8,7 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** Projects round 2a (PR #8, in review): Auto vs Space, sections, Hub cards and links. Next is 2b, the Scouts engine (Find, Answer, Turn into), after Mehvish approves section 3 of `plans/Projects_v2_Plan.md`.
+**Working on:** Projects round 2a (PR #8, in review, redesigned after Mehvish's feedback). Next is 2b, the Scouts engine (Find, Answer, Turn into; design approved), using the Bright Data SERP API zone `serp_api1` with Light JSON.
 **Done:** F1 Smart Inbox (PR #5), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
@@ -36,7 +36,7 @@ Ordered. Feature numbers match the plan.
 - [ ] Check Bright Data on the Mac: paste the allrecipes link, look for `[link] read … with Bright Data` (F1)
 - [ ] Service Scout with Bright Data SERP API + Web Unlocker (F5, Bright Data prize)
 - [ ] Try PR #8 on the Mac with gemma3:4b: make a Space and an Auto project and check the sections and proposed steps
-- [ ] Approve the Scouts design (plan section 3), then build 2b
+- [ ] Build Scouts 2b (design approved). Add `BRIGHTDATA_SERP_ZONE="serp_api1"` to `.env`
 - [ ] Decide on Factory Droid SDK or Fetch.ai for the Scouts (F5)
 - [ ] Status dot shows offline too, not just AI on or off (F6)
 - [ ] Seed script for the demo
@@ -61,6 +61,19 @@ Ordered. Feature numbers match the plan.
 ---
 
 ## Log
+
+### 2026-10-24 · Projects round 2a redesign (PR #8)
+
+Mehvish tried round 2a and didn't like the cards or the new-project box. Changes:
+
+- **Cards:** filled with the project color (text turns white or dark to stay readable). The Space/Auto word is gone. A ⋯ menu renames, recolors, or deletes. Link circles sit on all four sides and show on nearby cards as a line approaches.
+- **New project:** each kind has a one-line description. The kind is chosen only here; the switch inside a project is gone.
+  - Space: sections can be reordered with a handle, and **+ Writing** / **+ Tasks** buttons add more inline.
+  - Auto: no sections at creation. Instead you give links, notes, or inbox items. Pasted links become sources.
+- **Auto projects:** after creation the AI plans 4–7 step sections, each with an explanation and subtasks, always including Troubleshooting. They show as proposed (keep or drop). The planner gets a 240s timeout, because the 60s default likely cut off gemma3:4b before. You add other sections yourself inside.
+- **Sections:** a visible grab handle on each header.
+- **New section type `step`** (explanation + subtasks). Kind can no longer be changed through the API.
+- **Bright Data SERP zone:** Mehvish made `serp_api1` (Standard, pay as you go). Data format: Light JSON, since Scouts only need title, link, and description. The Scout code will also set the format per call.
 
 ### 2026-10-24 · Projects round 2a (PR #8)
 

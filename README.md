@@ -98,14 +98,17 @@ Hover over any icon to see what it does.
 - **The AI learns from your moves:** when you move an item to another category, the AI sees that the next time it sorts something similar. It also sees every category (including ones you made) and a few items already in each, so it knows what each one is for. If an item names one of your categories ("banana bread" → **Banana Bread**), it goes there.
 - **Delete an item:** hover over it and click the trash icon. This deletes it for good, including any uploaded file.
 - **Hub:** drag the background or scroll with two fingers to move around. Pinch (or hold Ctrl and scroll) to zoom. The button at the top right shows or hides the inbox.
-- **New project:** click **+** at the bottom left of the Hub and describe it in one sentence ("replace the ceiling fan in my bedroom"). The AI suggests a name, **Space** or **Auto**, and sections. You can change any of it: pick a section's type (Writing or Tasks), rename it, remove it with ×, or add more with **+ Section** (as many Writing sections as you like). Every project gets one Sources section. With the AI off, the closest built-in template is used (Research Paper, Class, Event, Learning, or Utility Task).
-- **Project cards:** drag a card to move it, and click it to open the project. Click its name to rename it, and its square to change its color. Drag the bottom-right corner to resize it. Drag an inbox item onto a card to add it to that project's sources.
-- **Linking projects:** hover over a card and drag the small circle on its right edge onto another card. Linked projects show each other's sources. Click a line to change its color or remove it.
+- **New project:** click **+** at the bottom left of the Hub and describe it in one sentence ("replace the ceiling fan in my bedroom"). The AI suggests a name and **Space** or **Auto**, and you can change either. The kind is set here only.
+  - **Space** is a workspace you set up. You get the AI's suggested sections: change a section's type or name, drag the handle on its left to reorder, remove it with ×, or add more with **+ Writing** and **+ Tasks**. Every project gets one Sources section. With the AI off, the closest built-in template is used (Research Paper, Class, Event, Learning, or Utility Task).
+  - **Auto** lets the AI break the project into steps. Give it links, notes, or items **From inbox** to work from (all optional). Links you paste become sources.
+- **Project cards:** the card is filled with the project's color. Drag it to move, click to open. The ⋯ menu renames it, changes its color, or deletes it. Drag the bottom-right corner to resize it. Drag an inbox item onto a card to add it to that project's sources.
+- **Linking projects:** hover over a card and drag a circle on any side onto another card. Circles show on nearby cards as the line gets close. Linked projects show each other's sources. Click a line to change its color or remove it.
 - **Inside a project:**
   - **Writing** sections have formatting (bold, italic, headings, lists) in a small bar that shows while you type. ⌘B and ⌘I work too.
-  - **Tasks:** check off, reword, and add. In **Auto** projects the AI proposes steps with a short how-to under each. Click ✓ to keep a step or × to drop it, or **Keep all**.
+  - **Tasks:** check off, reword, and add.
+  - **Auto steps:** after you create an Auto project, the AI works out the steps (this can take a minute). Each step has an explanation and subtasks, and there's always a Troubleshooting step. Click ✓ to keep a step or × to drop it, or **Keep all**. Add your own sections with **+ Section**.
   - **Sources:** paste a link, write a note, or upload a file. It's added to the inbox too. **From inbox** searches the inbox, filters by category, and groups results by category. × takes a source out of the project (it stays in the inbox).
-  - **Arranging:** drag a section by its header onto another section's edge. Left or right puts them side by side, and top or bottom stacks them. ↔ switches a section between half and full width.
+  - **Arranging:** drag a section by the handle in its header onto another section's edge. Left or right puts them side by side, and top or bottom stacks them. ↔ switches a section between half and full width.
   - **Scouts** (on the left) are coming next. They'll search the web for things the project needs.
 - **From a tray:** the chip next to the category says which project the item is in. Click it to pick another project or **No project**.
 

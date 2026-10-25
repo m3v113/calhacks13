@@ -63,3 +63,6 @@ export const WidthIcon = () => (
 export const UploadIcon = () => (
   <svg {...p}><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></svg>
 );
+export const EditIcon = () => (
+  <svg {...p}><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14 6l4 4" /></svg>
+);
