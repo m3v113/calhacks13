@@ -419,6 +419,7 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .scout-new { display: flex; flex-direction: column; gap: 8px; }
 .scout-new textarea { margin: 0 !important; width: 100% !important; border-color: var(--line) !important; background: var(--surface) !important; min-height: 64px; }
 .scout-new .kind-switch { background: var(--hover); }
+.scout-about { margin: 0; font-size: 12px; color: var(--muted); }
 .scout-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .scout-actions button { padding: 6px 14px; border-radius: 999px; color: var(--muted); font-size: 13px; }
 .scout-actions button:hover { background: var(--hover); color: var(--ink); }
@@ -473,7 +474,7 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .writing-text h1 { font-size: 21px; margin: 10px 0 6px; line-height: 1.25; }
 .writing-text h2 { font-size: 17px; margin: 8px 0 4px; }
 .writing-text ul, .writing-text ol { margin: 0 0 6px; padding-left: 22px; }
-.writing-text a { text-decoration: underline; }
+.writing-text a { text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .writing.empty .writing-text p:first-child::before { content: attr(data-placeholder); content: "Write here"; color: var(--muted); float: left; height: 0; pointer-events: none; }
 
 /* Tasks */

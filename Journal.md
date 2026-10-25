@@ -68,6 +68,14 @@ Scouts are built, following plan section 3. They run only when you press Run.
 
 - **One engine, three kinds:** Find (options to compare), Answer (short points, each citing its pages), Turn into (sources → tasks, citations, a table, or an outline). The kind is guessed from the brief's words (`lib/scoutKind.ts`) and can be changed.
 - **A run:** the local AI writes 1–3 searches → Bright Data SERP API (`data_format: "parsed_light"`, set per call, so the zone's own format setting doesn't matter) → the top 6 pages read with `readLink` (direct first, Web Unlocker only if blocked, cached) → the local AI pulls out the result. Progress is saved at each step and shown live.
+- **Round 3 feedback** (Mehvish tried Scouts with real search: Find worked):
+  - **Resources in every Auto project:** with the SERP API, one search per new Auto project (`<goal> guide`) gives the Resources section and extra context for the planner. Without it, the AI suggests sites. Links the AI writes (Markdown or bare) become real links, and ones whose page doesn't load become plain text.
+  - **Links open on press** in Writing sections. Clicking didn't work: focusing the editor shows the toolbar, which moves the text before the click lands.
+  - **Sources is now Brain Dump**, the same name as the inbox (`names.inbox`). Old "Sources" sections are renamed on the first page load.
+  - **Auto lag fixed:** in `next dev` each route can load its own copy of `lib/projects.ts`, so the "planning" set the create route filled wasn't the one the project page read. The sets live on `globalThis` now, and the page also checks back while a new Auto project only has its Brain Dump.
+  - **Find tags:** values must look like values (short, and with a number for price, size, rating...). Fields no option has are dropped.
+  - **Slow searches:** 60s limit, and one more try after a timeout or a 5xx.
+  - **Scout kinds** each have a one-line explanation under the switch.
 - **Auto sections are just there:** no more "The AI suggested… Keep all" or ✓/× on each one. Mehvish found having to keep sections confusing. You delete the ones you don't want. Old proposed sections and tasks are marked kept on the first page load.
 - **Costs:** at most 3 searches and 6 page reads per run. Searches are cached for 7 days (`SearchCache`), so a re-run with the same searches costs nothing.
 - **Guards:** results that point at pages that weren't read are dropped. Without `BRIGHTDATA_SERP_ZONE`, Find says web search isn't set up, and Answer uses the local AI only and says so.

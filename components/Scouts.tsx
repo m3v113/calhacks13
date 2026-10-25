@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScoutResult } from "@/lib/scouts";
 import { guessKind, type ScoutKind } from "@/lib/scoutKind";
+import { names } from "@/lib/names";
 import { CheckIcon, PlusIcon, RefreshIcon, TrashIcon } from "./Icons";
 
 type Scout = { id: string; kind: ScoutKind; brief: string; status: string; note: string | null; result: ScoutResult | null };
@@ -9,6 +10,11 @@ export type ScoutDraft = { brief: string; n: number };
 
 const KINDS: { kind: ScoutKind; label: string }[] = [{ kind: "find", label: "Find" }, { kind: "answer", label: "Answer" }, { kind: "turn", label: "Turn into" }];
 const BUSY = ["searching", "reading", "thinking"];
+const ABOUT: Record<ScoutKind, string> = {
+  find: "Searches the web for options to compare, like products, services, or papers.",
+  answer: "Searches the web and writes a short answer, with a link for each point.",
+  turn: `Turns your ${names.inbox} (and links you paste) into tasks, citations, a table, or an outline.`,
+};
 const PLACEHOLDER: Record<ScoutKind, string> = {
   find: "52-inch fan with a light under $200",
   answer: "How do I balance a wobbly fan?",
@@ -125,14 +131,15 @@ export default function Scouts({ projectId, draft, onAdded }: { projectId: strin
               <button key={k.kind} role="radio" aria-checked={chosen === k.kind} className={chosen === k.kind ? "on" : ""} onClick={() => setKind(k.kind)}>{k.label}</button>
             ))}
           </div>
+          <p className="scout-about">{ABOUT[chosen]}</p>
           <div className="scout-actions">
             <button onClick={() => { setWriting(false); setBrief(""); setKind(null); }}>Cancel</button>
-            <button className="primary" disabled={!brief.trim()} onClick={run} data-tip={chosen === "turn" ? "Reads your sources" : "Up to 3 searches and 6 pages"}>Run</button>
+            <button className="primary" disabled={!brief.trim()} onClick={run} data-tip={chosen === "turn" ? `Reads your ${names.inbox}` : "Up to 3 searches and 6 pages"}>Run</button>
           </div>
         </div>
       )}
 
-      {!writing && !scouts.length && <p className="muted scout-empty">Find options, answer a question, or turn your sources into tasks or citations.</p>}
+      {!writing && !scouts.length && <p className="muted scout-empty">Scouts search the web or read your {names.inbox} for you.</p>}
 
       <ul className="scout-list">
         {scouts.map((s) => {
@@ -177,7 +184,7 @@ function Result({ scout, saved, onSaveLink, onAdd }: {
               <li key={key}>
                 <div className="opt-top">
                   <a href={o.link} target="_blank" rel="noreferrer" className="opt-name">{o.name}</a>
-                  <button className="icon small" aria-label={`Save ${o.name} to Sources`} data-tip="Save to Sources" disabled={saved.has(key)} onClick={() => onSaveLink(key, o.link)}>
+                  <button className="icon small" aria-label={`Save ${o.name} to ${names.inbox}`} data-tip={`Save to ${names.inbox}`} disabled={saved.has(key)} onClick={() => onSaveLink(key, o.link)}>
                     {saved.has(key) ? <CheckIcon /> : <PlusIcon />}
                   </button>
                 </div>

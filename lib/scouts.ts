@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { db } from "./db";
 import { chatJSON, ollamaUp } from "./ollama";
 import { readLink } from "./link";
+import { names } from "./names";
 export { guessKind } from "./scoutKind";
 
 export { SCOUT_KINDS, type ScoutKind } from "./scoutKind";
@@ -17,13 +18,19 @@ export type AnswerResult = { kind: "answer"; points: { text: string; sources: nu
 export type TurnResult = { kind: "turn"; into: string; title: string; items: string[]; columns: string[]; rows: string[][]; pages: Page[]; skipped: number };
 export type ScoutResult = FindResult | AnswerResult | TurnResult;
 
-const searchReady = () => !!(process.env.BRIGHTDATA_API_KEY && process.env.BRIGHTDATA_SERP_ZONE);
-type Hit = { title: string; link: string; description: string };
+export const searchReady = () => !!(process.env.BRIGHTDATA_API_KEY && process.env.BRIGHTDATA_SERP_ZONE);
+export type Hit = { title: string; link: string; description: string };
 
 // One Google search through the Bright Data SERP API, as light JSON (title, link, description).
-async function search(query: string): Promise<Hit[] | string> {
+export async function search(query: string): Promise<Hit[] | string> {
   const cached = await db.searchCache.findUnique({ where: { query } });
   if (cached && Date.now() - cached.fetchedAt.getTime() < SEARCH_DAYS * 86400_000) return JSON.parse(cached.results);
+  // Bright Data is sometimes slow: a search that times out or hits a server error is tried once more.
+  const first = await searchOnce(query);
+  return typeof first === "string" && /too long|HTTP 5/.test(first) ? searchOnce(query) : first;
+}
+
+async function searchOnce(query: string): Promise<Hit[] | string> {
   try {
     const r = await fetch("https://api.brightdata.com/request", {
       method: "POST",
@@ -33,7 +40,7 @@ async function search(query: string): Promise<Hit[] | string> {
         // brd_json asks for parsed JSON too, in case the zone ignores data_format.
         url: `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en&gl=us&brd_json=1`,
       }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(60000),
     });
     const body = await r.text();
     if (!r.ok) {
@@ -97,7 +104,7 @@ fields: 2 to 4 short column names that matter for this request (products: "Price
 options: up to 6 real options found in the pages. Each has:
 - name: the product, business, or paper name
 - page: the number of the page it came from
-- values: one short value per field, in the same order ("" when the page doesn't say)
+- values: the option's actual value for each field, in the same order, copied from the page: a price like "$199", a size like "220 x 220 mm", a rating like "4.5/5", a year like "2023". Use "" when the page doesn't give that exact value. Never put a description or opinion in a value.
 - why: one short sentence on why it fits the request
 Never invent options, prices, or numbers that aren't in the pages.
 Answer with JSON: {"fields": ["..."], "options": [{"name": "...", "page": 1, "values": ["..."], "why": "..."}]}`;
@@ -123,7 +130,8 @@ const clip = (t: string, n: number) => t.replace(/\s+/g, " ").trim().slice(0, n)
 
 // Runs a Scout: plan searches → search → read pages → pull out results. Status is saved at each step,
 // so the page can show progress. Only ever started by pressing Run.
-const running = new Set<string>();
+const gs = globalThis as unknown as { scoutRunning?: Set<string> };
+const running = (gs.scoutRunning ??= new Set<string>());
 export function queueScout(id: string) {
   after(() => runScout(id));
 }
@@ -147,7 +155,7 @@ async function runScout(id: string) {
     let result: ScoutResult;
 
     if (s.kind === "turn") {
-      await status("reading", "Reading your sources");
+      await status("reading", `Reading your ${names.inbox}`);
       const links = [...new Set(s.brief.match(/https?:\/\/[^\s<>"']+/g) ?? [])].slice(0, MAX_PAGES);
       const pages: Page[] = [];
       const parts: string[] = [];
@@ -164,7 +172,7 @@ async function runScout(id: string) {
         pages.push({ n: pages.length + 1, title: name, link: i.url ?? "" });
         parts.push(`[${pages.length}] ${name}${i.url ? ` (${i.url})` : ""}\n${[page?.summary, i.overview].filter(Boolean).join(" ")}\n${clip(page?.text || i.extracted || i.text, 1500)}`);
       }
-      if (!parts.length) { await status("failed", "Nothing to read. Add sources to the project, or paste links in the brief."); return; }
+      if (!parts.length) { await status("failed", `Nothing to read. Add things to the ${names.inbox}, or paste links in the brief.`); return; }
       await status("thinking", "Putting it together");
       const a = await chatJSON(TURN_SYSTEM, `Request: ${s.brief}\n\nPages and notes:\n${parts.join("\n\n").slice(0, 14000)}`, {
         type: "object",
@@ -217,10 +225,17 @@ async function runScout(id: string) {
             const o = v as { fields: unknown; options: unknown };
             return isStrings(o?.fields) && Array.isArray(o.options) && o.options.every((x) => typeof x?.name === "string" && typeof x?.page === "number" && isStrings(x?.values) && typeof x?.why === "string");
           }, { timeoutMs: 240_000 });
-          const fields = a.fields.map((f) => clip(f, 24)).filter(Boolean).slice(0, 4);
-          const options = a.options.filter((o) => pages[o.page - 1] && clip(o.name, 120)).slice(0, 6).map((o) => ({
-            name: clip(o.name, 120), link: pages[o.page - 1].link, values: fields.map((_, i) => clip(o.values[i] ?? "", 60)), why: clip(o.why, 300),
+          // A value has to look like one: short, and with a number for fields that are numbers (price, size...).
+          const numeric = (f: string) => /price|cost|size|rating|weight|year|dimension|speed|volume|capacity|distance|length|width|height|stars?/i.test(f);
+          const fit = (f: string, v: string) => (v.length <= 30 && (!numeric(f) || /\d/.test(v)) ? v : "");
+          const allFields = a.fields.map((f) => clip(f, 24)).filter(Boolean).slice(0, 4);
+          let options = a.options.filter((o) => pages[o.page - 1] && clip(o.name, 120)).slice(0, 6).map((o) => ({
+            name: clip(o.name, 120), link: pages[o.page - 1].link, values: allFields.map((f, i) => fit(f, clip(o.values[i] ?? "", 60))), why: clip(o.why, 300),
           }));
+          // Fields that no option has a value for are dropped.
+          const keep = allFields.map((_, i) => options.some((o) => o.values[i]));
+          const fields = allFields.filter((_, i) => keep[i]);
+          options = options.map((o) => ({ ...o, values: o.values.filter((_, i) => keep[i]) }));
           if (!options.length) { await status("failed", "Nothing that fits was found. Try a broader brief."); return; }
           result = { kind: "find", fields, options, pages, skipped, queries: qs };
         } else {

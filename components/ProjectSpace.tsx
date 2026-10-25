@@ -68,12 +68,15 @@ export default function ProjectSpace({ id }: { id: string }) {
   useEffect(() => { if (project) document.title = project.title; }, [project?.title]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // While the AI builds an Auto project, check back every few seconds.
+  // A new Auto project with nothing but its Brain Dump is still being laid out, too.
   const planning = !!project?.planning;
+  const waiting = planning || (project?.kind === "auto" && project.sections.every((s) => s.type === "sources"));
   useEffect(() => {
-    if (!planning) return;
-    const t = setInterval(load, 2500);
+    if (!waiting) return;
+    let n = 0;
+    const t = setInterval(() => { if (++n > 120) clearInterval(t); else load(); }, 2500);
     return () => clearInterval(t);
-  }, [planning, load]);
+  }, [waiting, load]);
 
   const colorRef = useDismiss<HTMLDivElement>(coloring, () => setColoring(false));
   const addRef = useDismiss<HTMLDivElement>(adding, () => setAdding(false));

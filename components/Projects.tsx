@@ -6,6 +6,7 @@ import type { Item, useInbox } from "@/lib/useInbox";
 import { DRAG } from "./Inbox";
 import Swatches from "./Swatches";
 import InboxPicker, { itemName } from "./InboxPicker";
+import { names } from "@/lib/names";
 import { CloseIcon, EditIcon, GripIcon, LockIcon, MoreIcon, PlusIcon, TrashIcon } from "./Icons";
 
 type Projects = ReturnType<typeof useProjects>;
@@ -294,14 +295,14 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
                 {s.sections.map((sec, i) => (
                   <li key={sec.key ?? i} className={dragging === i ? "lifted" : ""}>
                     <span className="np-grip" aria-label="Drag to reorder" onPointerDown={startMove(i)}><GripIcon /></span>
-                    {sec.type === "sources" ? <span className="np-type">Sources</span> : (
+                    {sec.type === "sources" ? <span className="np-type">{names.inbox}</span> : (
                       <select className="np-type" value={sec.type} aria-label="Section type" onChange={(e) => setSection(i, { type: e.target.value })}>
                         {TYPES.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
                       </select>
                     )}
                     <input value={sec.title} aria-label="Section name" onChange={(e) => setSection(i, { title: e.target.value })} />
                     {sec.type === "sources"
-                      ? <span className="np-lock" aria-label="Every project has Sources" data-tip="Every project has Sources"><LockIcon /></span>
+                      ? <span className="np-lock" aria-label={`Every project has a ${names.inbox}`} data-tip={`Every project has a ${names.inbox}`}><LockIcon /></span>
                       : <button aria-label={`Remove ${sec.title}`} onClick={() => setS({ ...s, sections: s.sections.filter((_, j) => j !== i) })}><CloseIcon /></button>}
                   </li>
                 ))}

@@ -99,21 +99,21 @@ Hover over any icon to see what it does.
 - **Delete an item:** hover over it and click the trash icon. This deletes it for good, including any uploaded file.
 - **Hub:** drag the background or scroll with two fingers to move around. Pinch (or hold Ctrl and scroll) to zoom. The button at the top right shows or hides the inbox.
 - **New project:** click **+** at the bottom left of the Hub and describe it in one sentence ("replace the ceiling fan in my bedroom"). The AI suggests a name and **Space** or **Auto**, and you can change either. The kind is set here only.
-  - **Space** is a workspace you set up. You get the AI's suggested sections: change a section's type or name, drag the handle on its left to reorder, remove it with ×, or add more with **+ Writing** and **+ Tasks**. Every project gets one Sources section. With the AI off, the closest built-in template is used (Research Paper, Class, Event, Learning, or Utility Task).
+  - **Space** is a workspace you set up. You get the AI's suggested sections: change a section's type or name, drag the handle on its left to reorder, remove it with ×, or add more with **+ Writing** and **+ Tasks**. Every project gets one **Brain Dump** section (its own links, files, and notes; the lock shows it can't be removed). With the AI off, the closest built-in template is used (Research Paper, Class, Event, Learning, or Utility Task).
   - **Auto** lets the AI break the project into steps. Give it links, notes, or items **From inbox** to work from (all optional). Links you paste become sources.
 - **Project cards:** the card is filled with the project's color. Drag it to move, click to open. The ⋯ menu renames it, changes its color, or deletes it. Drag the bottom-right corner to resize it. Drag an inbox item onto a card to add it to that project's sources.
 - **Linking projects:** hover over a card and drag a circle on any side onto another card. Circles show on nearby cards as the line gets close. Linked projects show each other's sources. Click a line to change its color or remove it.
 - **Inside a project:**
   - **Writing** sections have formatting (bold, italic, headings, lists) in a small bar that shows while you type. ⌘B and ⌘I work too.
   - **Tasks:** check off, reword, and add.
-  - **Auto projects:** after you create one, the AI lays it out in sections (this can take a minute): short explanations, key points, facts, and checklists, including what to do if something goes wrong. Delete any section you don't need with its trash icon, and add your own with **+ Section**.
-  - **Sources:** paste a link, write a note, or upload a file. It's added to the inbox too. **From inbox** searches the inbox, filters by category, and groups results by category. × takes a source out of the project (it stays in the inbox).
+  - **Auto projects:** after you create one, the AI lays it out in sections (this can take a minute): short explanations, key points, facts, and checklists, including what to do if something goes wrong. Every Auto project ends with **Resources**: real pages from one web search when Bright Data's SERP API is set up (that search also helps the AI plan), otherwise well-known sites the AI suggests, with dead links removed. Click a link to open it. Delete any section you don't need with its trash icon, and add your own with **+ Section**.
+  - **Brain Dump** (the project's own): paste a link, write a note, or upload a file. It's added to the main Brain Dump too. **From inbox** searches the inbox, filters by category, and groups results by category. × takes it out of the project (it stays in the main Brain Dump).
   - **Arranging:** drag a section by the handle in its header onto another section's edge. Left or right puts them side by side, and top or bottom stacks them. ↔ switches a section between half and full width.
   - **Scouts** (on the left) do one job when you press **Run**. Click **+**, write what you need, and check the kind (it's guessed from your words):
-    - **Find** searches the web and gives options to compare, like fans with their price and size. **+** saves one to Sources.
+    - **Find** searches the web and gives options to compare, like fans with their price and size. **+** saves one to the project's Brain Dump.
     - **Answer** searches the web, reads a few pages, and writes a short answer. Each point links to its page. Without Bright Data it answers from the local AI and says so.
-    - **Turn into** reads your Sources (and any links in the brief) and turns them into tasks, citations, a table, or an outline.
-    - **Add to project** puts the result in a new section. **Send to Scouts** (the magnifier on a task) starts a Scout from that task. Each run uses at most 3 searches and 6 page reads, and the same search isn't paid for twice within a week.
+    - **Turn into** reads the project's Brain Dump (and any links in the brief) and turns them into tasks, citations, a table, or an outline.
+    - **Add to project** puts the result in a new section. **Send to Scouts** (the magnifier on a task) starts a Scout from that task. Each run uses at most 3 searches (one that times out is tried once more) and 6 page reads, and the same search isn't paid for twice within a week.
 - **From a tray:** the chip next to the category says which project the item is in. Click it to pick another project or **No project**.
 
 ---
