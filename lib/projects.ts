@@ -153,15 +153,26 @@ Answer with JSON: {"sections": [{"title": "...", "form": "text", "text": "...", 
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const clean = (t: string) => t.replace(/^[-•*\d.)\s]+/, "").replace(/\s+/g, " ").trim();
 
+// The small model sometimes writes Markdown (**bold**, "* " bullets) and long paragraphs. Bold becomes
+// <strong>, bullets inside the text become list items, and the text keeps its first 4 sentences.
+const inline = (t: string) => esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*\*/g, "");
+function splitText(text: string) {
+  const [intro, ...bullets] = text.split(/\s+\*\s+(?=\S)/);
+  const sentences = intro.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g) ?? [intro];
+  return { intro: sentences.slice(0, 4).join("").trim(), bullets: bullets.map(clean).filter(Boolean) };
+}
+
 // A planned section as one of ours: text, points, and facts are Writing (formatted); checklists are Tasks.
 function toSection(s: PlanSection) {
-  const items = s.items.map(clean).filter(Boolean).slice(0, 8).map((t) => t.slice(0, 300));
-  const text = s.text.replace(/\s+/g, " ").trim().slice(0, 1200);
+  const raw = s.text.replace(/\s+/g, " ").trim().slice(0, 1500);
+  const { intro, bullets } = splitText(raw);
+  const items = [...bullets, ...s.items.map(clean)].filter(Boolean).slice(0, 8)
+    .map((t) => t.replace(/^label:\s*/i, "").replace(/\*\*/g, "").slice(0, 300));
   const title = cleanTitle(s.title).slice(0, 40);
   if (s.form === "checklist" && items.length) return { title, type: "tasks", notes: null, tasks: items };
   const fact = (t: string) => { const m = t.match(/^([^:]{1,40}):\s*(.+)$/); return m ? `<strong>${esc(m[1])}:</strong> ${esc(m[2])}` : esc(t); };
-  const list = items.length ? `<ul>${items.map((t) => `<li><p>${s.form === "facts" ? fact(t) : esc(t)}</p></li>`).join("")}</ul>` : "";
-  const notes = `${text ? `<p>${esc(text)}</p>` : ""}${list}`;
+  const list = items.length ? `<ul>${items.map((t) => `<li><p>${s.form === "facts" || bullets.length ? fact(t) : esc(t)}</p></li>`).join("")}</ul>` : "";
+  const notes = `${intro ? `<p>${inline(intro)}</p>` : ""}${list}`;
   return notes ? { title, type: "writing", notes, tasks: [] } : null;
 }
 

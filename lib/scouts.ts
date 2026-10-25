@@ -21,7 +21,7 @@ const searchReady = () => !!(process.env.BRIGHTDATA_API_KEY && process.env.BRIGH
 type Hit = { title: string; link: string; description: string };
 
 // One Google search through the Bright Data SERP API, as light JSON (title, link, description).
-async function search(query: string): Promise<Hit[] | null> {
+async function search(query: string): Promise<Hit[] | string> {
   const cached = await db.searchCache.findUnique({ where: { query } });
   if (cached && Date.now() - cached.fetchedAt.getTime() < SEARCH_DAYS * 86400_000) return JSON.parse(cached.results);
   try {
@@ -30,23 +30,34 @@ async function search(query: string): Promise<Hit[] | null> {
       headers: { authorization: `Bearer ${process.env.BRIGHTDATA_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({
         zone: process.env.BRIGHTDATA_SERP_ZONE, format: "raw", data_format: "parsed_light",
-        url: `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en&gl=us`,
+        // brd_json asks for parsed JSON too, in case the zone ignores data_format.
+        url: `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en&gl=us&brd_json=1`,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(45000),
     });
     const body = await r.text();
-    if (!r.ok) { console.warn(`[scout] search failed: HTTP ${r.status} ${body.slice(0, 200)}`); return null; }
-    const j = JSON.parse(body);
-    const organic: Record<string, unknown>[] = j.organic ?? j.results ?? [];
+    if (!r.ok) {
+      console.warn(`[scout] search failed: HTTP ${r.status} ${r.headers.get("x-brd-error") ?? ""} ${body.slice(0, 300)}`);
+      return `HTTP ${r.status}${r.status === 401 ? ", the API key was refused" : r.status === 403 || r.status === 400 ? `, ${(r.headers.get("x-brd-error") ?? body).slice(0, 120)}` : ""}`;
+    }
+    let j;
+    try { j = JSON.parse(body); } catch {
+      console.warn(`[scout] search gave back something that isn't JSON: ${body.slice(0, 300)}`);
+      return "the answer wasn't JSON";
+    }
+    // Some Bright Data replies wrap the results: { status_code, body: "<json>" }.
+    if (typeof j?.body === "string") { try { j = JSON.parse(j.body); } catch {} }
+    const organic: Record<string, unknown>[] = j?.organic ?? j?.results ?? [];
     const hits = organic.map((o) => ({
       title: String(o.title ?? ""), link: String(o.link ?? o.url ?? ""), description: String(o.description ?? o.snippet ?? ""),
     })).filter((h) => /^https?:\/\//.test(h.link) && h.title).slice(0, 10);
     console.log(`[scout] searched "${query}" with Bright Data: ${hits.length} results`);
+    if (!hits.length) { console.warn(`[scout] no results in: ${body.slice(0, 300)}`); return hits; }
     await db.searchCache.upsert({ where: { query }, create: { query, results: JSON.stringify(hits) }, update: { results: JSON.stringify(hits), fetchedAt: new Date() } });
     return hits;
   } catch (e) {
     console.warn("[scout] search failed:", (e as Error).message);
-    return null;
+    return (e as Error).name === "TimeoutError" ? "it took too long" : (e as Error).message.slice(0, 120);
   }
 }
 
@@ -128,6 +139,9 @@ async function runScout(id: string) {
     });
     if (!s) return;
     const project = [s.project.title, s.project.goal].filter(Boolean).join(": ");
+    // Find and Answer also know what's in the project's Sources, so results fit what you've saved.
+    const saved = s.project.items.slice(0, 8).map((i) => `- ${i.title ?? i.fileName ?? i.url ?? "Note"}${i.overview ? `: ${clip(i.overview, 200)}` : ""}`).join("\n");
+    const known = saved ? `\nSaved in the project's Sources:\n${saved}` : "";
     const aiUp = await ollamaUp();
     if (!aiUp) { await status("failed", "The local AI isn't running. Start Ollama and run it again."); return; }
     let result: ScoutResult;
@@ -169,13 +183,14 @@ async function runScout(id: string) {
         if (s.kind === "find") { await status("failed", "Web search isn't set up. Add BRIGHTDATA_SERP_ZONE to .env."); return; }
         // Answer still works without the web, from the local AI alone (and says so).
         await status("thinking", "Writing it up");
-        const a = await chatJSON(LOCAL_ANSWER_SYSTEM, `Project: ${project}\nQuestion: ${s.brief}`, ANSWER_SCHEMA, isPoints, { timeoutMs: 240_000 });
+        const a = await chatJSON(LOCAL_ANSWER_SYSTEM, `Project: ${project}${known}\nQuestion: ${s.brief}`, ANSWER_SCHEMA, isPoints, { timeoutMs: 240_000 });
         result = { kind: "answer", points: a.points.map((p) => ({ text: clip(p.text, 600), sources: [] })).slice(0, 6), pages: [], skipped: 0, queries: [], local: true };
       } else {
         await status("searching", "Searching");
         const qs = await queries(s.brief, project);
-        const lists = (await Promise.all(qs.map(search))).filter((l): l is Hit[] => !!l);
-        if (!lists.length) { await status("failed", "The search didn't work. Check the Bright Data settings, then run it again."); return; }
+        const got = await Promise.all(qs.map(search));
+        const lists = got.filter((l): l is Hit[] => Array.isArray(l));
+        if (!lists.length) { await status("failed", `The search didn't work (${got.find((l) => typeof l === "string")}). Check the Bright Data settings, then run it again.`); return; }
         // Take the top results of each search in turn, without repeats.
         const hits: Hit[] = [];
         for (let i = 0; i < 10 && hits.length < MAX_PAGES; i++) {
@@ -189,7 +204,7 @@ async function runScout(id: string) {
         // A page that couldn't be read still counts with its search snippet.
         const text = hits.map((h, i) => `[${i + 1}] ${pages[i].title} (${h.link})\n${h.description}\n${clip(read[i]?.text ?? "", 2500)}`).join("\n\n");
         await status("thinking", s.kind === "find" ? "Picking the best" : "Writing it up");
-        const user = `Project: ${project}\nRequest: ${s.brief}\n\nPages:\n${text}`.slice(0, 16000);
+        const user = `Project: ${project}${known}\nRequest: ${s.brief}\n\nPages:\n${text}`.slice(0, 16000);
         if (s.kind === "find") {
           const a = await chatJSON(FIND_SYSTEM, user, {
             type: "object",
