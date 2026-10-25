@@ -659,3 +659,6 @@ body.moving, body.moving * { cursor: grabbing !important; user-select: none; }
 .found-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .found-title { font-weight: 600; }
 .found-hit { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.agenda li.done .check { background: var(--ink); box-shadow: none; color: var(--surface); }
+.agenda li.done .agenda-text { color: var(--muted); text-decoration: line-through; }
+.agenda li.done .due-pick { display: none; }

@@ -45,6 +45,7 @@ model Item {
   dueTime    String? // "17:00"
   priority   Int? // 1 high, 2 medium, 3 low
   done       Boolean   @default(false) // checked off in the Tasks bar
+  doneAt     DateTime? // when, for the Done group
   projectId  String? // optional link to a project; it stays in its category too
   project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   archived   Boolean   @default(false)
@@ -119,6 +120,7 @@ model Task {
   detail    String? // how to do it (steps in Auto projects)
   proposed  Boolean  @default(false) // suggested by the AI and not yet approved
   done      Boolean  @default(false)
+  doneAt    DateTime? // when it was checked off, for the Done group
   dueDate   String? // "2026-10-26": with a date, time, or priority, it shows in the Tasks bar too
   dueTime   String? // "17:00"
   priority  Int? // 1 high, 2 medium, 3 low

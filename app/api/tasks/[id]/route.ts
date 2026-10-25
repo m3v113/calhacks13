@@ -9,7 +9,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const data: Record<string, unknown> = {};
-  if (typeof body.done === "boolean") data.done = body.done;
+  if (typeof body.done === "boolean") { data.done = body.done; data.doneAt = body.done ? new Date() : null; }
   if (body.proposed === false) data.proposed = false;
   if (typeof body.detail === "string") data.detail = body.detail.trim().slice(0, 600) || null;
   if (typeof body.text === "string" && body.text.trim()) data.text = body.text.trim().slice(0, 500);

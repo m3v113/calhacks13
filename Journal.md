@@ -64,6 +64,11 @@ Ordered. Feature numbers match the plan.
 
 ## Log
 
+### 2026-10-25 · Done group in Tasks (PR #12)
+
+- Checked-off tasks used to just disappear from Tasks. Now the last 10 (Pantry items and project tasks that had a date, time, or priority) show in a **Done** group at the bottom, newest first, struck through. Unchecking one puts it back in its group.
+- New field `doneAt` on `Item` and `Task`, set when something is checked off and cleared when it's unchecked. Things checked off before this change have no `doneAt`, so they don't show in Done. `npm run dev` adds the field with `prisma db push`, so restart it once.
+
 ### 2026-10-25 · Typed dates and times, new projects stay on the Hub (PR #11)
 
 - **The date is typed now**, because the browser's date field kept losing what Mehvish picked. `parseDate` in `lib/due.ts` reads "today", "tomorrow", weekdays ("fri", "next mon"), "in 3 days", "2w", "10/27", "10/27/2026", "oct 27", "27 oct", and "2026-10-27". A date without a year is the next one to come. The line under the box shows the day it read, or a hint when it can't read it. It's saved when the menu closes (Enter, a click outside, or Escape), so the row doesn't jump to another group while you type.
