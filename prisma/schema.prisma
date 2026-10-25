@@ -92,7 +92,7 @@ model Section {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  type      String // "writing" | "tasks" | "sources" | "step" (Auto: explanation + subtasks); older: "notes", "items", "providers"
+  type      String // "writing" | "tasks" | "sources" (the project's Brain Dump) | "resources" (Auto: links from a web search, read-only, JSON in notes) | "assistant" (ask the AI, JSON in notes) | "step" (older Auto); older: "notes", "items", "providers"
   proposed  Boolean  @default(false) // made by the AI and not yet kept
   title     String
   order     Int      @default(0)
@@ -140,6 +140,7 @@ model Scout {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   kind      String // "find" (options to compare) | "answer" (a write-up with citations) | "turn" (reshape pages into tasks, citations, a table)
   brief     String
+  taskId    String? // the task it was sent from: checked off when the Scout finishes
   status    String   @default("idle") // idle | searching | reading | thinking | done | failed
   note      String? // progress, or what went wrong
   result    String? // JSON, its shape depends on the kind

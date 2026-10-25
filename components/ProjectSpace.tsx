@@ -3,6 +3,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useInbox, type Item } from "@/lib/useInbox";
+import { names } from "@/lib/names";
+import { citationsHtml, host, richText } from "@/lib/format";
 import type { Kind } from "@/lib/useProjects";
 import ItemView from "./ItemView";
 import Writing from "./Writing";
@@ -10,7 +12,9 @@ import Swatches from "./Swatches";
 import { useDismiss } from "./Projects";
 import InboxPicker, { itemName } from "./InboxPicker";
 import Scouts, { type ScoutDraft } from "./Scouts";
-import { BackIcon, CheckIcon, CloseIcon, GripIcon, PlusIcon, ScoutIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
+import { Categories, DRAG, InboxList } from "./Inbox";
+import Mic from "./Mic";
+import { BackIcon, CheckIcon, CloseIcon, GripIcon, PanelIcon, PlusIcon, RefreshIcon, ScoutIcon, SparkIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
 
 type Task = { id: string; text: string; detail: string | null; proposed: boolean; done: boolean };
 type Section = { id: string; type: string; title: string; span: number; notes: string | null; proposed: boolean; tasks: Task[] };
@@ -22,7 +26,29 @@ type Project = {
 type Side = "left" | "right" | "top" | "bottom";
 type Inbox = ReturnType<typeof useInbox>;
 
-const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "Tasks" }];
+const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "Tasks" }, { type: "assistant", label: "AI" }];
+// An item dragged out of the project's Brain Dump (dropping it on the main Brain Dump takes it out of the project).
+const PDRAG = "application/x-project-item";
+
+// Sections sit in rows of two halves or one full width. A half with no half next to it fills its row,
+// so there are never empty gaps.
+function layout(sections: Section[]) {
+  const alone = new Set<string>();
+  const row = new Map<string, number>();
+  let r = 0;
+  for (let i = 0; i < sections.length; i++, r++) {
+    const s = sections[i];
+    row.set(s.id, r);
+    if (s.span === 2) continue;
+    if (sections[i + 1]?.span === 1) row.set(sections[++i].id, r);
+    else alone.add(s.id);
+  }
+  return { alone, row };
+}
+
+function stored<T>(key: string, fallback: T): T {
+  try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
+}
 
 const api = (url: string, method: string, body?: object) =>
   fetch(url, { method, headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
@@ -57,7 +83,14 @@ export default function ProjectSpace({ id }: { id: string }) {
   const [moving, setMoving] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [target, setTarget] = useState<{ id: string; side: Side } | null>(null);
   const [scoutDraft, setScoutDraft] = useState<ScoutDraft | null>(null);
+  // The main Brain Dump, as a panel on the right, to drag things into and out of the project.
+  const [panel, setPanel] = useState(false);
+  const [category, setCategory] = useState<string | null>(null);
+  const [panelOver, setPanelOver] = useState(false);
+  const [more, setMore] = useState<{ id: string; busy: boolean; note: string | null } | null>(null);
   const grid = useRef<HTMLDivElement>(null);
+  useEffect(() => setPanel(stored("space.panel", false)), []);
+  const togglePanel = () => { setPanel(!panel); try { localStorage.setItem("space.panel", JSON.stringify(!panel)); } catch {} };
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/projects/${id}`, { cache: "no-store" });
@@ -90,6 +123,7 @@ export default function ProjectSpace({ id }: { id: string }) {
     );
   }
   if (!project) return <div className="space" />;
+  const { alone } = layout(project.sections);
 
   const update = (change: Partial<Project>) => setProject((p) => (p ? { ...p, ...change } : p));
   const save = (body: object) => api(`/api/projects/${id}`, "PATCH", body);
@@ -113,7 +147,24 @@ export default function ProjectSpace({ id }: { id: string }) {
     if (!confirm(`Delete "${project.title}"? Its sources stay in the inbox.`)) return;
     api(`/api/projects/${id}`, "DELETE").then(() => router.push("/"));
   };
-  const toScout = (brief: string) => setScoutDraft((d) => ({ brief, n: (d?.n ?? 0) + 1 }));
+  const toScout = (brief: string, taskId?: string) => setScoutDraft((d) => ({ brief, taskId, n: (d?.n ?? 0) + 1 }));
+  const link = (item: Item) => {
+    if (project.items.some((i) => i.id === item.id)) return;
+    update({ items: [item, ...project.items] });
+    api(`/api/items/${item.id}`, "PATCH", { projectId: project.id }).then(() => { load(); inbox.refresh(); });
+  };
+  const unlink = (itemId: string) => {
+    update({ items: project.items.filter((i) => i.id !== itemId) });
+    api(`/api/items/${itemId}`, "PATCH", { projectId: null }).then(inbox.refresh);
+  };
+  // More resources: the next page of the search. Only when you press the button, since searches are paid.
+  const moreResources = async (s: Section) => {
+    setMore({ id: s.id, busy: true, note: null });
+    const r = await api(`/api/sections/${s.id}/more`, "POST");
+    const j = r.ok ? await r.json() : { note: "Couldn't get more. Try again." };
+    if (j.notes) setSection(s.id, (x) => ({ ...x, notes: j.notes }));
+    setMore({ id: s.id, busy: false, note: j.note });
+  };
 
   // Drop a section on the edge of another: left or right puts them side by side, top or bottom stacks them.
   const place = (from: string, to: string, side: Side) => {
@@ -123,10 +174,16 @@ export default function ProjectSpace({ id }: { id: string }) {
     if (!moved || j < 0) return;
     list.splice(side === "left" || side === "top" ? j : j + 1, 0, moved);
     const halves = side === "left" || side === "right";
-    const next = list.map((s) => (halves && (s.id === from || s.id === to) ? { ...s, span: 1 } : s));
+    let next = list.map((s) => (halves && (s.id === from || s.id === to) ? { ...s, span: 1 } : s));
+    // Side by side means the same row. If the half before them would pair with one of them instead, it goes full width.
+    const { row } = layout(next);
+    if (halves && row.get(from) !== row.get(to)) {
+      const first = next.findIndex((s) => s.id === from || s.id === to);
+      if (first > 0) next = next.map((s, i) => (i === first - 1 ? { ...s, span: 2 } : s));
+    }
     update({ sections: next });
     save({ order: next.map((s) => s.id) });
-    if (halves) for (const sid of [from, to]) if (project.sections.find((s) => s.id === sid)?.span !== 1) api(`/api/sections/${sid}`, "PATCH", { span: 1 });
+    for (const s of next) if (project.sections.find((x) => x.id === s.id)?.span !== s.span) api(`/api/sections/${s.id}`, "PATCH", { span: s.span });
   };
 
   // Moving uses pointer events, so it works the same in every browser. A press that doesn't move is a normal click.
@@ -184,10 +241,11 @@ export default function ProjectSpace({ id }: { id: string }) {
           )}
         </div>
         <Line className="space-title" label="Project name" value={project.title} onSave={(title) => { update({ title }); save({ title }); }} />
+        <button className={`icon ${panel ? "on" : ""}`} aria-label={panel ? `Hide ${names.inbox}` : `Show ${names.inbox}`} aria-pressed={panel} data-tip={names.inbox} onClick={togglePanel}><PanelIcon /></button>
         <button className="icon" aria-label="Delete project" data-tip="Delete project" onClick={remove}><TrashIcon /></button>
       </header>
 
-      <div className="space-cols">
+      <div className={`space-cols ${panel ? "with-panel" : ""}`}>
         <aside className="side-tray scouts">
           <Scouts projectId={id} draft={scoutDraft} onAdded={() => { load(); inbox.refresh(); }} />
         </aside>
@@ -200,15 +258,21 @@ export default function ProjectSpace({ id }: { id: string }) {
           )}
           {project.sections.map((s) => (
             <section key={s.id} data-section={s.id}
-              className={`section ${s.span === 2 ? "wide" : ""} ${moving?.id === s.id ? "lifted" : ""} ${target?.id === s.id ? `drop-${target.side}` : ""}`}
+              className={`section ${s.span === 2 || alone.has(s.id) ? "wide" : ""} ${moving?.id === s.id ? "lifted" : ""} ${target?.id === s.id ? `drop-${target.side}` : ""}`}
               style={moving?.id === s.id ? { transform: `translate(${moving.dx}px, ${moving.dy}px)` } : undefined}
             >
               <div className="section-top" onPointerDown={startMove(s.id)}>
                 <span className="grip" aria-hidden="true"><GripIcon /></span>
                 <Line className="section-title" label="Section name" value={s.title} onSave={(title) => patchSection(s.id, { title })} />
-                <button className="icon small fade" aria-label={s.span === 2 ? "Half width" : "Full width"} data-tip={s.span === 2 ? "Half width" : "Full width"}
-                  onClick={() => patchSection(s.id, { span: s.span === 2 ? 1 : 2 })}><WidthIcon /></button>
-                {s.type !== "sources" && (
+                {s.type === "resources" && (
+                  <button className="icon small fade" aria-label="More resources" data-tip="More" disabled={more?.id === s.id && more.busy}
+                    onClick={() => moreResources(s)}><RefreshIcon /></button>
+                )}
+                {!(alone.has(s.id) && s.span === 1) && (
+                  <button className="icon small fade" aria-label={s.span === 2 ? "Half width" : "Full width"} data-tip={s.span === 2 ? "Half width" : "Full width"}
+                    onClick={() => patchSection(s.id, { span: s.span === 2 ? 1 : 2 })}><WidthIcon /></button>
+                )}
+                {s.type !== "sources" && s.type !== "resources" && (
                   <button className="icon small fade" aria-label={`Delete ${s.title}`} data-tip="Delete section" onClick={() => removeSection(s)}><TrashIcon /></button>
                 )}
               </div>
@@ -220,10 +284,23 @@ export default function ProjectSpace({ id }: { id: string }) {
                 </>
               )}
               {s.type === "writing" && <Writing label={s.title} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />}
-              {s.type === "sources" && <Sources project={project} inbox={inbox} reload={load} onOpen={setViewing} update={update} />}
+              {s.type === "sources" && <Sources project={project} inbox={inbox} reload={load} onOpen={setViewing} link={link} unlink={unlink} />}
+              {s.type === "resources" && <Resources section={s} busy={more?.id === s.id && more.busy} note={more?.id === s.id ? more.note : null} />}
+              {s.type === "assistant" && <Assistant section={s} setSection={setSection} projectId={id} onAdded={load} />}
             </section>
           ))}
         </main>
+
+        {panel && (
+          <aside className={`side-tray space-panel ${panelOver ? "over" : ""}`}
+            onDragOver={(e) => { if (e.dataTransfer.types.includes(PDRAG)) { e.preventDefault(); setPanelOver(true); } }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPanelOver(false); }}
+            onDrop={(e) => { const i = e.dataTransfer.getData(PDRAG); setPanelOver(false); if (i) { e.preventDefault(); unlink(i); } }}>
+            <div className="label">{names.inbox}</div>
+            <Categories inbox={inbox} selected={category} onSelect={setCategory} chips />
+            <InboxList inbox={inbox} selected={category} exclude={new Set(project.items.map((i) => i.id))} />
+          </aside>
+        )}
       </div>
 
       <div className="add-section" ref={addRef}>
@@ -241,7 +318,7 @@ export default function ProjectSpace({ id }: { id: string }) {
 }
 
 function Tasks({ section, setSection, planning, onScout }: {
-  section: Section; setSection: (id: string, change: (s: Section) => Section) => void; planning: boolean; onScout: (brief: string) => void;
+  section: Section; setSection: (id: string, change: (s: Section) => Section) => void; planning: boolean; onScout: (brief: string, taskId: string) => void;
 }) {
   const [text, setText] = useState("");
   const change = (tid: string, c: Partial<Task>) => {
@@ -268,7 +345,7 @@ function Tasks({ section, setSection, planning, onScout }: {
             <Line wrap className="task-text" label="Task" value={t.text} onSave={(text) => change(t.id, { text })} />
             {t.detail && <div className="task-detail">{t.detail}</div>}
           </div>
-          <button className="icon small fade" aria-label="Send to Scouts" data-tip="Send to Scouts" onClick={() => onScout(t.text)}><ScoutIcon /></button>
+          <button className="icon small fade" aria-label="Send to Scouts" data-tip="Send to Scouts" onClick={() => onScout(t.text, t.id)}><ScoutIcon /></button>
           <button className="icon small fade" aria-label="Delete task" onClick={() => remove(t.id)}><CloseIcon /></button>
         </li>
       ))}
@@ -283,27 +360,36 @@ function Tasks({ section, setSection, planning, onScout }: {
 }
 
 function SourceRow({ item, color, onOpen, onRemove }: { item: Item; color?: string; onOpen: () => void; onRemove?: () => void }) {
+  const pending = item.sortedBy === "pending";
   return (
-    <li onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) onOpen(); }}>
-      <span className={`dot ${item.sortedBy === "pending" ? "pending" : ""}`} style={item.sortedBy === "pending" ? undefined : { background: color || "var(--line)" }} />
+    <li draggable={!!onRemove && !pending} onDragStart={(e) => { e.dataTransfer.setData(PDRAG, item.id); e.dataTransfer.effectAllowed = "move"; }}
+      onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) onOpen(); }}>
+      <span className={`dot ${pending ? "pending" : ""}`} style={pending ? undefined : { background: color || "var(--line)" }} />
       <span className="name">{itemName(item)}</span>
       {onRemove && <button className="icon small fade" aria-label="Remove from project" onClick={onRemove}><CloseIcon /></button>}
     </li>
   );
 }
 
-// The project's sources: its own items, the ones of linked projects, a box to add new ones
-// (which go to the inbox too), and a picker for items already in the inbox.
-function Sources({ project, inbox, reload, onOpen, update }: {
-  project: Project; inbox: Inbox; reload: () => void; onOpen: (id: string) => void; update: (c: Partial<Project>) => void;
+// The project's Brain Dump: its own items sorted by category, the ones of linked projects, a box to add new ones
+// (which go to the main Brain Dump too), and a picker for items already there. Items dragged in from the
+// main Brain Dump panel join the project; dragging one back out takes it out of the project.
+function Sources({ project, inbox, reload, onOpen, link, unlink }: {
+  project: Project; inbox: Inbox; reload: () => void; onOpen: (id: string) => void; link: (item: Item) => void; unlink: (id: string) => void;
 }) {
   const [text, setText] = useState("");
   const [picking, setPicking] = useState(false);
   const [up, setUp] = useState(false);
+  const [over, setOver] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
   const ref = useDismiss<HTMLDivElement>(picking, () => setPicking(false));
   const color = new Map(inbox.categories.map((c) => [c.id, c.color]));
   const mine = new Set(project.items.map((i) => i.id));
+  // Grouped like the main Brain Dump: one group per category, in the same order, then anything not sorted yet.
+  const groups = [
+    ...inbox.categories.map((c) => ({ id: c.id, name: c.name, items: project.items.filter((i) => i.categoryId === c.id) })),
+    { id: "none", name: "", items: project.items.filter((i) => !i.categoryId || !color.has(i.categoryId)) },
+  ].filter((g) => g.items.length);
 
   // Poll while a new source is still being sorted, so its title shows up.
   const sorting = project.items.some((i) => i.sortedBy === "pending");
@@ -313,8 +399,7 @@ function Sources({ project, inbox, reload, onOpen, update }: {
     return () => clearInterval(t);
   }, [sorting, reload]);
 
-  const add = async () => {
-    const t = text.trim();
+  const add = async (t = text.trim()) => {
     if (!t) return;
     setText("");
     await api("/api/items", "POST", { text: t, projectId: project.id });
@@ -329,22 +414,26 @@ function Sources({ project, inbox, reload, onOpen, update }: {
     }));
     reload(); inbox.refresh();
   };
-  const link = (item: Item) => {
-    update({ items: [item, ...project.items] });
-    api(`/api/items/${item.id}`, "PATCH", { projectId: project.id }).then(() => { reload(); inbox.refresh(); });
-  };
-  const unlink = (itemId: string) => {
-    update({ items: project.items.filter((i) => i.id !== itemId) });
-    api(`/api/items/${itemId}`, "PATCH", { projectId: null }).then(inbox.refresh);
-  };
 
   return (
-    <>
-      <ul className="linked">
-        {project.items.map((i) => (
-          <SourceRow key={i.id} item={i} color={i.categoryId ? color.get(i.categoryId) : undefined} onOpen={() => onOpen(i.id)} onRemove={() => unlink(i.id)} />
-        ))}
-      </ul>
+    <div className={`brain ${over ? "over" : ""}`}
+      onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG)) { e.preventDefault(); setOver(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false); }}
+      onDrop={(e) => {
+        setOver(false);
+        const item = inbox.items.find((i) => i.id === e.dataTransfer.getData(DRAG));
+        if (item) { e.preventDefault(); link(item); }
+      }}>
+      {groups.map((g) => (
+        <div key={g.id} className="brain-group">
+          {g.name && <div className="pick-head">{g.name}</div>}
+          <ul className="linked">
+            {g.items.map((i) => (
+              <SourceRow key={i.id} item={i} color={i.categoryId ? color.get(i.categoryId) : undefined} onOpen={() => onOpen(i.id)} onRemove={() => unlink(i.id)} />
+            ))}
+          </ul>
+        </div>
+      ))}
       {project.linked.filter((l) => l.items.length).map((l) => (
         <div key={l.id} className="from-linked">
           <div className="from-label"><span className="dot square" style={{ background: l.color ?? "var(--muted)" }} />{l.title}</div>
@@ -358,14 +447,121 @@ function Sources({ project, inbox, reload, onOpen, update }: {
         <input value={text} placeholder="Paste a link or write a note" aria-label="Add a source"
           onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) add(); }}
           onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); upload(e.clipboardData.files); } }} />
+        <Mic onText={(t) => (text.trim() ? setText(`${text.trim()} ${t}`) : add(t))} />
         <button className="icon small" aria-label="Upload a file" data-tip="Upload" onClick={() => picker.current?.click()}><UploadIcon /></button>
         <input ref={picker} type="file" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ""; }} />
         <div className="add-linked" ref={ref}>
           <button className="from-inbox" aria-expanded={picking}
-            onClick={(e) => { setUp(e.currentTarget.getBoundingClientRect().bottom + 400 > window.innerHeight); setPicking(!picking); }}>From inbox</button>
+            onClick={(e) => { setUp(e.currentTarget.getBoundingClientRect().bottom + 400 > window.innerHeight); setPicking(!picking); }}>From {names.inbox}</button>
           {picking && <InboxPicker inbox={inbox} up={up} exclude={mine} onPick={(i) => link(i)} />}
         </div>
       </div>
+    </div>
+  );
+}
+
+type Hit = { title: string; link: string; description: string };
+
+// Resources: pages to read, with what each one offers. Read-only; the refresh button above adds more.
+function Resources({ section, busy, note }: { section: Section; busy: boolean; note: string | null }) {
+  let hits: Hit[] = [];
+  try { hits = JSON.parse(section.notes ?? "").hits ?? []; } catch {}
+  return (
+    <>
+      <ul className="resources">
+        {hits.map((h) => (
+          <li key={h.link}>
+            <a href={h.link} target="_blank" rel="noreferrer">
+              <span className="res-title">{h.title}</span>
+              {h.description && <span className="res-about">{h.description}</span>}
+              <span className="res-host">{host(h.link)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      {busy && <div className="pending-lines" aria-label="Finding more"><span /><span /></div>}
+      {note && <p className="muted">{note}</p>}
     </>
+  );
+}
+
+type Ask = { q: string; into: "answer" | "tasks" | "citations" | "rewrite"; title: string; reply: string; items: string[]; at: string };
+const ASK_EXAMPLES = ["Make tasks for this project", "Make my Introduction sound formal", "Make APA citations for my sources"];
+
+// The AI section: ask about what's in the project. Answers stay here (newest first); you can add one to the project.
+function Assistant({ section, setSection, projectId, onAdded }: {
+  section: Section; setSection: (id: string, change: (s: Section) => Section) => void; projectId: string; onAdded: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const [asking, setAsking] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [added, setAdded] = useState<Set<string>>(new Set());
+  const box = useRef<HTMLTextAreaElement>(null);
+  let asks: Ask[] = [];
+  try { asks = JSON.parse(section.notes ?? "").asks ?? []; } catch {}
+  useEffect(() => { const el = box.current; if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } }, [q]);
+
+  const send = async () => {
+    const t = q.trim();
+    if (!t || asking) return;
+    setAsking(t); setError(null); setQ("");
+    const r = await api(`/api/sections/${section.id}/ask`, "POST", { q: t }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    setAsking(null);
+    if (r?.ok) { setSection(section.id, (s) => ({ ...s, notes: JSON.stringify({ asks: j.asks }) })); setOpen(j.asks[0]?.at ?? null); }
+    else { setError(j.error ?? "Something went wrong. Ask again."); setQ(t); }
+  };
+  const remove = async (a: Ask) => {
+    setSection(section.id, (s) => ({ ...s, notes: JSON.stringify({ asks: asks.filter((x) => x.at !== a.at) }) }));
+    api(`/api/sections/${section.id}/ask?at=${encodeURIComponent(a.at)}`, "DELETE");
+  };
+  const add = async (a: Ask) => {
+    setAdded((cur) => new Set(cur).add(a.at));
+    const paras = (t: string) => t.split(/\n\s*\n/).map((p) => `<p>${richText(p.trim())}</p>`).join("");
+    const body = a.into === "tasks" ? { type: "tasks", title: a.title, tasks: a.items }
+      : { type: "writing", title: a.title, notes: a.into === "citations" ? citationsHtml(a.items) : `${paras(a.reply)}${a.items.length ? `<ul>${a.items.map((t) => `<li><p>${richText(t)}</p></li>`).join("")}</ul>` : ""}` };
+    await api(`/api/projects/${projectId}/sections`, "POST", body);
+    onAdded();
+  };
+
+  return (
+    <div className="assistant">
+      <div className="ask-box">
+        <SparkIcon />
+        <textarea ref={box} rows={1} value={q} aria-label="Ask the AI" placeholder={ASK_EXAMPLES[asks.length % ASK_EXAMPLES.length]}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }} />
+      </div>
+      {error && <p className="muted">{error}</p>}
+      {asking && (
+        <div className="ask">
+          <div className="ask-q"><span className="name">{asking}</span></div>
+          <div className="pending-lines"><span /><em>Thinking…</em></div>
+        </div>
+      )}
+      {asks.map((a, i) => {
+        const shown = open === a.at || (open === null && i === 0 && !asking);
+        return (
+          <div key={a.at} className="ask">
+            <div className="ask-q">
+              <button className="name" aria-expanded={shown} onClick={() => setOpen(shown ? "" : a.at)}>{a.q}</button>
+              <button className="icon small fade" aria-label="Delete" onClick={() => remove(a)}><CloseIcon /></button>
+            </div>
+            {shown && (
+              <div className="ask-a">
+                {a.reply && a.reply.split(/\n\s*\n/).map((p, j) => <p key={j} dangerouslySetInnerHTML={{ __html: richText(p.trim()) }} />)}
+                {a.into === "citations"
+                  ? <div className="citations">{a.items.map((t, j) => <p key={j} dangerouslySetInnerHTML={{ __html: richText(t) }} />)}</div>
+                  : a.items.length > 0 && <ul>{a.items.map((t, j) => <li key={j} dangerouslySetInnerHTML={{ __html: richText(t) }} />)}</ul>}
+                <button className="scout-add" disabled={added.has(a.at)} onClick={() => add(a)}>
+                  {added.has(a.at) ? <><CheckIcon />Added</> : <><PlusIcon />{a.into === "tasks" ? "Add as tasks" : "Add to project"}</>}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Category, Item, useInbox } from "@/lib/useInbox";
-import { DocIcon, ImageIcon, LinkIcon, MoreIcon, NoteIcon, PlusIcon, TrashIcon } from "./Icons";
+import { CloseIcon, DocIcon, ImageIcon, LinkIcon, MoreIcon, NoteIcon, PlusIcon, ScoutIcon, TrashIcon } from "./Icons";
+import Mic from "./Mic";
 import { COLORS } from "@/lib/colors";
 import ItemView from "./ItemView";
 
@@ -115,9 +116,13 @@ const ADD: { kind: "note" | "link" | "image" | "document"; label: string; Icon: 
   { kind: "document", label: "Document", Icon: DocIcon, accept: ".pdf,.txt,.md,.csv,.json,.doc,.docx,.rtf,.pages,application/pdf,text/*" },
 ];
 
-// The capture box (with the + menu) and the item list.
-export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string | null }) {
+// Words to look for in an item: its title, text, address, file name, and summary.
+export const matches = (i: Item, q: string) => !q || [i.title, i.text, i.url, i.fileName, i.summary].join(" ").toLowerCase().includes(q);
+
+// The capture box (with the + menu and the mic), a search box, and the item list. `exclude` hides items (e.g. ones already in a project).
+export function InboxList({ inbox, selected, exclude }: { inbox: Inbox; selected: string | null; exclude?: Set<string> }) {
   const [text, setText] = useState("");
+  const [q, setQ] = useState("");
   const [mode, setMode] = useState<"note" | "link">("note");
   const [adding, setAdding] = useState(false);
   const [dropping, setDropping] = useState(false);
@@ -126,7 +131,8 @@ export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string 
   const picker = useRef<HTMLInputElement>(null);
   const addMenu = useRef<HTMLDivElement>(null);
   const byId = new Map(inbox.categories.map((c) => [c.id, c]));
-  const items = selected ? inbox.items.filter((i) => i.categoryId === selected) : inbox.items;
+  const needle = q.trim().toLowerCase();
+  const items = inbox.items.filter((i) => (!selected || i.categoryId === selected) && !exclude?.has(i.id) && matches(i, needle));
 
   useEffect(() => {
     const el = box.current;
@@ -203,13 +209,23 @@ export function InboxList({ inbox, selected }: { inbox: Inbox; selected: string 
             }
           }}
         />
+        {/* Speaking with an empty box saves the note right away (hands-free); otherwise the words are added to the box. */}
+        <Mic onText={(t) => { if (text.trim()) setText(`${text.trim()} ${t}`); else inbox.add(t, "note"); }} />
         <input ref={picker} type="file" multiple hidden onChange={(e) => { files(e.target.files); e.target.value = ""; }} />
       </div>
+      {inbox.items.length > 0 && (
+        <div className="find">
+          <ScoutIcon />
+          <input value={q} placeholder="Search" aria-label="Search" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQ("")} />
+          {q && <button className="icon small" aria-label="Clear search" onClick={() => setQ("")}><CloseIcon /></button>}
+        </div>
+      )}
       <ul className="items">
         {items.map((i) => (
           <Row key={i.id} item={i} category={i.categoryId ? byId.get(i.categoryId) : undefined} inbox={inbox} showCat={!selected} onOpen={() => setViewing(i.id)} />
         ))}
       </ul>
+      {needle && !items.length && <p className="muted find-none">Nothing found</p>}
       {viewing && <ItemView id={viewing} inbox={inbox} onClose={() => setViewing(null)} />}
     </div>
   );

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { SECTION_TYPES } from "@/lib/projects";
+import { ADDABLE } from "@/lib/projects";
 
 // Add a section to the end of a project: { type, title, notes?, tasks? }. Writing sections start full width.
 // Scouts use notes and tasks to add what they found.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  if (!SECTION_TYPES.includes(body.type)) return NextResponse.json({ error: "bad type" }, { status: 400 });
+  if (!(ADDABLE as readonly string[]).includes(body.type)) return NextResponse.json({ error: "bad type" }, { status: 400 });
   const last = await db.section.findFirst({ where: { projectId: id }, orderBy: { order: "desc" }, select: { order: true } });
   try {
     const section = await db.section.create({

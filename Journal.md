@@ -8,7 +8,7 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** Projects round 2a (PR #8) and Scouts 2b (PR #9, built on PR #8), both in review. Next is 2c: researched Auto layouts (an Answer Scout feeding the planner).
+**Working on:** round 4 (PR #10): read-only Resources, AI section, project Brain Dump with drag and drop, Brain Dump search, and the Cartesia mic.
 **Done:** F1 Smart Inbox, now called Brain Dump (PR #5, renamed in PR #7), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
@@ -36,7 +36,8 @@ Ordered. Feature numbers match the plan.
 - [ ] Check Bright Data on the Mac: paste the allrecipes link, look for `[link] read … with Bright Data` (F1)
 - [ ] Service Scout with Bright Data SERP API + Web Unlocker (F5, Bright Data prize)
 - [ ] Try PR #8 on the Mac with gemma3:4b: make a Space and an Auto project and check the sections and proposed steps
-- [ ] Try Scouts (PR #9) with `BRIGHTDATA_SERP_ZONE="serp_api1"` in `.env`
+- [ ] Try a Find Scout again with PR #10. If it still fails, copy the `[scout] search gave back` line from the Terminal
+- [ ] Add `CARTESIA_API_KEY` to `.env` and try the mic
 - [ ] Decide on Factory Droid SDK or Fetch.ai for the Scouts (F5)
 - [ ] Status dot shows offline too, not just AI on or off (F6)
 - [ ] Seed script for the demo
@@ -56,11 +57,30 @@ Ordered. Feature numbers match the plan.
 - [x] Side trays, New category and drag-to-tag in the sidebar (2026-10-24, PR #4, merged)
 - [x] Edit and delete categories, change category in a tray, AI learns from moves, Bright Data backup for blocked links, inbox final pass (2026-10-24, PR #5, merged)
 - [x] F3 + F4: project cards on the Hub, new project from one sentence, project space with tasks, notes, linked items, and summary, plus a project chip in the tray (2026-10-24, PR #6, merged)
-- [x] Projects round 2a: Auto vs Space, Writing/Tasks/Sources sections in a grid, formatting, Sources that add to the inbox, bigger cards, links between projects (2026-10-24, PR #8)
+- [x] Projects round 2a: Auto vs Space, Writing/Tasks/Sources sections in a grid, formatting, Sources that add to the inbox, bigger cards, links between projects (2026-10-24, PR #8, merged)
+- [x] Scouts (Find, Answer, Turn into) with Bright Data SERP, Resources in Auto projects (2026-10-24, PR #9, merged)
 
 ---
 
 ## Log
+
+### 2026-10-25 · Round 4: Resources, AI section, project Brain Dump, mic (PR #10)
+
+Mehvish's round 4 feedback, after trying PR #9 with real search.
+
+- **"The answer wasn't JSON" (Find failed after a long wait):** the cause on her Mac is still unknown, so the search now handles every shape Bright Data can send. Google's page (HTML) is read for its result links. Anything else, like a plain-text error or an empty answer, gets one more try asking for Bright Data's wrapped JSON (`format: "json"`, results in `body`). If that fails too, the message shows the start of what Bright Data sent.
+- **Resources is read-only:** a new section type, `resources`. It's stored as JSON (the search words, how far into the results it is, and the pages), and shown like Scout results. The whole row is the link. The refresh icon fetches the next page of the same search (`&start=10`, one paid search per press), or more AI-suggested sites without search. It can't be deleted. Old Resources Writing sections are converted on the first page load.
+- **Auto projects are one Overview:** one full-width Writing section with a heading per part, one To do from the checklists, and Resources, instead of 4–6 sections. Mehvish found it too much text. Tasks stay a separate section so they can be checked off and sent to Scouts.
+- **AI section (`assistant`):** added with + Section → AI. It answers requests about what's in the project, on the local AI: make tasks, rewrite formally, feedback, citations. It reads the writing, tasks, Brain Dump (with page text), and links pasted in the request. Answers are kept in the section (last 10). Add as tasks / Add to project make sections.
+- **Turn into moved to the AI section** (Mehvish's choice on a decision card). Scouts are just Find and Answer, the ones that use the web. Old Turn into Scouts still show and can be re-run.
+- **Task checked off:** a Scout sent from a task stores `taskId` and checks the task when it finishes. The page reloads when Scouts stop running.
+- **Citations:** one per paragraph with a hanging indent, *italic* where the AI marks it, and links. Same in Writing when added.
+- **Scout explanations:** two sentences each, with examples.
+- **Layout without gaps:** sections are laid out in rows of two halves or one full width. A half with no half next to it fills its row. Dropping one beside another keeps them in the same row (the half before them goes full width if it would pair instead).
+- **Project Brain Dump:** grouped by category like the main one. A panel icon on the project page shows the main Brain Dump on the right. Drag from it into the project's Brain Dump to add, and drag back out to remove.
+- **Brain Dump search:** under the capture box, in titles, notes, links, file names, and summaries.
+- **Mic (Cartesia Ink-Whisper):** records in the browser, `/api/transcribe` sends it to Cartesia's `/stt` with `CARTESIA_API_KEY`. With an empty box, the note is saved right away (for phone or driving).
+- **New field:** `Scout.taskId`. `prisma db push` adds it without touching data.
 
 ### 2026-10-24 · Scouts (PR #9)
 

@@ -11,7 +11,8 @@ export async function GET(_req: Request, { params }: Ctx) {
   return NextResponse.json(scouts.map(view));
 }
 
-// A new Scout, run right away: { brief, kind? }. Without a kind, it's guessed from the brief.
+// A new Scout, run right away: { brief, kind?, taskId? }. Without a kind, it's guessed from the brief.
+// A Scout sent from a task checks that task off when it finishes.
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
@@ -19,7 +20,8 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!brief) return NextResponse.json({ error: "empty brief" }, { status: 400 });
   const kind = SCOUT_KINDS.includes(body.kind) ? body.kind : guessKind(brief);
   try {
-    const scout = await db.scout.create({ data: { projectId: id, brief, kind, status: "searching", note: "Starting" } });
+    const task = typeof body.taskId === "string" ? await db.task.findFirst({ where: { id: body.taskId, section: { projectId: id } }, select: { id: true } }) : null;
+    const scout = await db.scout.create({ data: { projectId: id, brief, kind, taskId: task?.id, status: "searching", note: "Starting" } });
     queueScout(scout.id);
     return NextResponse.json(view(scout));
   } catch {

@@ -3,17 +3,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScoutResult } from "@/lib/scouts";
 import { guessKind, type ScoutKind } from "@/lib/scoutKind";
 import { names } from "@/lib/names";
+import { citationsHtml, esc, host, richText } from "@/lib/format";
 import { CheckIcon, PlusIcon, RefreshIcon, TrashIcon } from "./Icons";
 
 type Scout = { id: string; kind: ScoutKind; brief: string; status: string; note: string | null; result: ScoutResult | null };
-export type ScoutDraft = { brief: string; n: number };
+// A brief sent from a task. That task is checked off when the Scout finishes.
+export type ScoutDraft = { brief: string; n: number; taskId?: string };
 
-const KINDS: { kind: ScoutKind; label: string }[] = [{ kind: "find", label: "Find" }, { kind: "answer", label: "Answer" }, { kind: "turn", label: "Turn into" }];
+// Scouts use the web. Reshaping what's already in the project (tasks, citations) is the AI section's job,
+// so "Turn into" only shows for Scouts made before.
+const KINDS: { kind: ScoutKind; label: string }[] = [{ kind: "find", label: "Find" }, { kind: "answer", label: "Answer" }];
+const LABEL: Record<ScoutKind, string> = { find: "Find", answer: "Answer", turn: "Turn into" };
 const BUSY = ["searching", "reading", "thinking"];
 const ABOUT: Record<ScoutKind, string> = {
-  find: "Searches the web for options to compare, like products, services, or papers.",
-  answer: "Searches the web and writes a short answer, with a link for each point.",
-  turn: `Turns your ${names.inbox} (and links you paste) into tasks, citations, a table, or an outline.`,
+  find: "Finds real options on the web and lines them up to compare, with prices, sizes, or ratings when the pages give them. For things to buy, people to hire, or papers to read. Save the ones you like to the project.",
+  answer: "Searches the web and answers your question in a few short points. Each point links to the page it came from, so you can check it.",
+  turn: `Turns your ${names.inbox} into tasks, citations, a table, or an outline.`,
 };
 const PLACEHOLDER: Record<ScoutKind, string> = {
   find: "52-inch fan with a light under $200",
@@ -23,8 +28,6 @@ const PLACEHOLDER: Record<ScoutKind, string> = {
 
 const api = (url: string, method: string, body?: object) =>
   fetch(url, { method, headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
-const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const host = (link: string) => { try { return new URL(link).hostname.replace(/^www\./, ""); } catch { return link; } };
 
 // The pages an answer actually cites, in order.
 const cited = (r: Extract<ScoutResult, { kind: "answer" }>) =>
@@ -47,6 +50,7 @@ function asSection(s: Scout): { type: string; title: string; notes?: string; tas
     return { type: "writing", title, notes: `<ul>${r.options.map(row).join("")}</ul>` };
   }
   if (r.into === "tasks") return { type: "tasks", title: r.title, tasks: r.items };
+  if (r.into === "citations") return { type: "writing", title: r.title, notes: citationsHtml(r.items) };
   const items = r.into === "table" ? r.rows.map((row) => row.map((c, i) => `${r.columns[i] ? `${r.columns[i]}: ` : ""}${c}`).join(" · ")) : r.items;
   return { type: "writing", title: r.title, notes: `<ul>${items.map((t) => `<li><p>${esc(t)}</p></li>`).join("")}</ul>` };
 }
@@ -54,6 +58,7 @@ function asSection(s: Scout): { type: string; title: string; notes?: string; tas
 // The Scouts panel: write a brief, pick the kind (guessed for you), and Run. Each Scout shows its
 // progress, then what it found, which you can add to the project.
 export default function Scouts({ projectId, draft, onAdded }: { projectId: string; draft: ScoutDraft | null; onAdded: () => void }) {
+  const [taskId, setTaskId] = useState<string | undefined>();
   const [scouts, setScouts] = useState<Scout[]>([]);
   const [writing, setWriting] = useState(false);
   const [brief, setBrief] = useState("");
@@ -75,23 +80,30 @@ export default function Scouts({ projectId, draft, onAdded }: { projectId: strin
     const t = setInterval(load, 1500);
     return () => clearInterval(t);
   }, [busy, load]);
+  // When Scouts finish, the project reloads, so a task a Scout was sent from shows as done.
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (wasBusy.current && !busy) onAdded();
+    wasBusy.current = busy;
+  }, [busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A task sent from the project opens a new brief with its text.
   useEffect(() => {
     if (!draft) return;
-    setBrief(draft.brief); setKind(null); setWriting(true);
+    setBrief(draft.brief); setKind(null); setWriting(true); setTaskId(draft.taskId);
     setTimeout(() => { box.current?.focus(); box.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 0);
   }, [draft]);
 
-  const chosen = kind ?? guessKind(brief);
+  const guess = guessKind(brief);
+  const chosen = kind ?? (guess === "turn" ? "answer" : guess);
   const run = async () => {
     const b = brief.trim();
     if (!b) return;
-    const r = await api(`/api/projects/${projectId}/scouts`, "POST", { brief: b, kind: chosen });
+    const r = await api(`/api/projects/${projectId}/scouts`, "POST", { brief: b, kind: chosen, taskId });
     if (!r.ok) return;
     const s: Scout = await r.json();
     setScouts([s, ...scouts]); setOpen(s.id);
-    setWriting(false); setBrief(""); setKind(null);
+    setWriting(false); setBrief(""); setKind(null); setTaskId(undefined);
   };
   const rerun = async (s: Scout) => {
     setScouts(scouts.map((x) => (x.id === s.id ? { ...x, status: "searching", note: "Starting" } : x)));
@@ -133,13 +145,13 @@ export default function Scouts({ projectId, draft, onAdded }: { projectId: strin
           </div>
           <p className="scout-about">{ABOUT[chosen]}</p>
           <div className="scout-actions">
-            <button onClick={() => { setWriting(false); setBrief(""); setKind(null); }}>Cancel</button>
-            <button className="primary" disabled={!brief.trim()} onClick={run} data-tip={chosen === "turn" ? `Reads your ${names.inbox}` : "Up to 3 searches and 6 pages"}>Run</button>
+            <button onClick={() => { setWriting(false); setBrief(""); setKind(null); setTaskId(undefined); }}>Cancel</button>
+            <button className="primary" disabled={!brief.trim()} onClick={run} data-tip="Up to 3 searches and 6 pages">Run</button>
           </div>
         </div>
       )}
 
-      {!writing && !scouts.length && <p className="muted scout-empty">Scouts search the web or read your {names.inbox} for you.</p>}
+      {!writing && !scouts.length && <p className="muted scout-empty">Scouts search the web for you.</p>}
 
       <ul className="scout-list">
         {scouts.map((s) => {
@@ -149,7 +161,7 @@ export default function Scouts({ projectId, draft, onAdded }: { projectId: strin
             <li key={s.id} className={`scout ${s.status}`}>
               <div className="scout-top">
                 <button className="scout-brief" aria-expanded={shown} onClick={() => setOpen(shown ? "" : s.id)}>
-                  <span className="scout-kind">{KINDS.find((k) => k.kind === s.kind)?.label}</span>
+                  <span className="scout-kind">{LABEL[s.kind]}</span>
                   <span className="name">{s.brief}</span>
                 </button>
                 {!running && <button className="icon small fade" aria-label="Run again" data-tip="Run again" onClick={() => rerun(s)}><RefreshIcon /></button>}
@@ -209,6 +221,8 @@ function Result({ scout, saved, onSaveLink, onAdd }: {
               <tbody>{r.rows.map((row, i) => <tr key={i}>{row.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody>
             </table>
           </div>
+        ) : r.into === "citations" ? (
+          <div className="citations">{r.items.map((t, i) => <p key={i} dangerouslySetInnerHTML={{ __html: richText(t) }} />)}</div>
         ) : (
           <ul className="scout-items">{r.items.map((t, i) => <li key={i}>{t}</li>)}</ul>
         )
