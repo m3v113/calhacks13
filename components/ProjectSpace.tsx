@@ -9,7 +9,8 @@ import Writing from "./Writing";
 import Swatches from "./Swatches";
 import { useDismiss } from "./Projects";
 import InboxPicker, { itemName } from "./InboxPicker";
-import { BackIcon, CheckIcon, CloseIcon, GripIcon, PlusIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
+import Scouts, { type ScoutDraft } from "./Scouts";
+import { BackIcon, CheckIcon, CloseIcon, GripIcon, PlusIcon, ScoutIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
 
 type Task = { id: string; text: string; detail: string | null; proposed: boolean; done: boolean };
 type Section = { id: string; type: string; title: string; span: number; notes: string | null; proposed: boolean; tasks: Task[] };
@@ -55,6 +56,7 @@ export default function ProjectSpace({ id }: { id: string }) {
   // Moving a section: which one, where the pointer is, and where it would land.
   const [moving, setMoving] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [target, setTarget] = useState<{ id: string; side: Side } | null>(null);
+  const [scoutDraft, setScoutDraft] = useState<ScoutDraft | null>(null);
   const grid = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -118,6 +120,7 @@ export default function ProjectSpace({ id }: { id: string }) {
     api(`/api/sections/${s.id}`, "DELETE");
   };
   const proposed = project.sections.filter((s) => s.proposed);
+  const toScout = (brief: string) => setScoutDraft((d) => ({ brief, n: (d?.n ?? 0) + 1 }));
 
   // Drop a section on the edge of another: left or right puts them side by side, top or bottom stacks them.
   const place = (from: string, to: string, side: Side) => {
@@ -193,8 +196,7 @@ export default function ProjectSpace({ id }: { id: string }) {
 
       <div className="space-cols">
         <aside className="side-tray scouts">
-          <div className="label">Scouts</div>
-          <p className="muted">Coming soon.</p>
+          <Scouts projectId={id} draft={scoutDraft} onAdded={() => { load(); inbox.refresh(); }} />
         </aside>
 
         <main className="sections" ref={grid}>
@@ -229,11 +231,11 @@ export default function ProjectSpace({ id }: { id: string }) {
                   <button className="icon small fade" aria-label={`Delete ${s.title}`} data-tip="Delete section" onClick={() => removeSection(s)}><TrashIcon /></button>
                 )}
               </div>
-              {s.type === "tasks" && <Tasks section={s} setSection={setSection} planning={planning && s.id === project.sections.find((x) => x.type === "tasks")?.id} />}
+              {s.type === "tasks" && <Tasks section={s} setSection={setSection} onScout={toScout} planning={planning && s.id === project.sections.find((x) => x.type === "tasks")?.id} />}
               {s.type === "step" && (
                 <>
                   <Writing label={`${s.title}: how to`} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />
-                  <Tasks section={s} setSection={setSection} planning={false} />
+                  <Tasks section={s} setSection={setSection} onScout={toScout} planning={false} />
                 </>
               )}
               {s.type === "writing" && <Writing label={s.title} value={s.notes ?? ""} onSave={(notes) => patchSection(s.id, { notes })} />}
@@ -257,7 +259,9 @@ export default function ProjectSpace({ id }: { id: string }) {
   );
 }
 
-function Tasks({ section, setSection, planning }: { section: Section; setSection: (id: string, change: (s: Section) => Section) => void; planning: boolean }) {
+function Tasks({ section, setSection, planning, onScout }: {
+  section: Section; setSection: (id: string, change: (s: Section) => Section) => void; planning: boolean; onScout: (brief: string) => void;
+}) {
   const [text, setText] = useState("");
   const change = (tid: string, c: Partial<Task>) => {
     setSection(section.id, (s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === tid ? { ...t, ...c } : t)) }));
@@ -286,6 +290,7 @@ function Tasks({ section, setSection, planning }: { section: Section; setSection
             <Line wrap className="task-text" label="Task" value={t.text} onSave={(text) => change(t.id, { text })} />
             {t.detail && <div className="task-detail">{t.detail}</div>}
           </div>
+          {!t.proposed && <button className="icon small fade" aria-label="Send to Scouts" data-tip="Send to Scouts" onClick={() => onScout(t.text)}><ScoutIcon /></button>}
           <button className={`icon small ${t.proposed ? "" : "fade"}`} aria-label={t.proposed ? "Remove this step" : "Delete task"} onClick={() => remove(t.id)}><CloseIcon /></button>
         </li>
       ))}

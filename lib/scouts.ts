@@ -1,0 +1,241 @@
+import { after } from "next/server";
+import { db } from "./db";
+import { chatJSON, ollamaUp } from "./ollama";
+import { readLink } from "./link";
+export { guessKind } from "./scoutKind";
+
+export { SCOUT_KINDS, type ScoutKind } from "./scoutKind";
+
+// Bright Data is paid, so each run is capped. Repeat searches come from the cache.
+export const MAX_SEARCHES = 3;
+export const MAX_PAGES = 6;
+const SEARCH_DAYS = 7;
+
+export type Page = { n: number; title: string; link: string };
+export type FindResult = { kind: "find"; fields: string[]; options: { name: string; link: string; values: string[]; why: string }[]; pages: Page[]; skipped: number; queries: string[] };
+export type AnswerResult = { kind: "answer"; points: { text: string; sources: number[] }[]; pages: Page[]; skipped: number; queries: string[]; local?: boolean };
+export type TurnResult = { kind: "turn"; into: string; title: string; items: string[]; columns: string[]; rows: string[][]; pages: Page[]; skipped: number };
+export type ScoutResult = FindResult | AnswerResult | TurnResult;
+
+const searchReady = () => !!(process.env.BRIGHTDATA_API_KEY && process.env.BRIGHTDATA_SERP_ZONE);
+type Hit = { title: string; link: string; description: string };
+
+// One Google search through the Bright Data SERP API, as light JSON (title, link, description).
+async function search(query: string): Promise<Hit[] | null> {
+  const cached = await db.searchCache.findUnique({ where: { query } });
+  if (cached && Date.now() - cached.fetchedAt.getTime() < SEARCH_DAYS * 86400_000) return JSON.parse(cached.results);
+  try {
+    const r = await fetch("https://api.brightdata.com/request", {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.BRIGHTDATA_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        zone: process.env.BRIGHTDATA_SERP_ZONE, format: "raw", data_format: "parsed_light",
+        url: `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en&gl=us`,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const body = await r.text();
+    if (!r.ok) { console.warn(`[scout] search failed: HTTP ${r.status} ${body.slice(0, 200)}`); return null; }
+    const j = JSON.parse(body);
+    const organic: Record<string, unknown>[] = j.organic ?? j.results ?? [];
+    const hits = organic.map((o) => ({
+      title: String(o.title ?? ""), link: String(o.link ?? o.url ?? ""), description: String(o.description ?? o.snippet ?? ""),
+    })).filter((h) => /^https?:\/\//.test(h.link) && h.title).slice(0, 10);
+    console.log(`[scout] searched "${query}" with Bright Data: ${hits.length} results`);
+    await db.searchCache.upsert({ where: { query }, create: { query, results: JSON.stringify(hits) }, update: { results: JSON.stringify(hits), fetchedAt: new Date() } });
+    return hits;
+  } catch (e) {
+    console.warn("[scout] search failed:", (e as Error).message);
+    return null;
+  }
+}
+
+// Reads a page (direct first, Web Unlocker only if blocked; cached), giving up after a while.
+async function readPage(link: string) {
+  const timeout = new Promise<null>((r) => setTimeout(() => r(null), 25000));
+  try {
+    const page = await Promise.race([readLink(link), timeout]);
+    return page?.ok ? page : null;
+  } catch {
+    return null;
+  }
+}
+
+const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
+const strArr = { type: "array", items: { type: "string" } };
+
+const QUERY_SYSTEM = `You turn a request into 1 to ${MAX_SEARCHES} Google searches that would find the best pages for it.
+Each search is 3 to 8 words. Use the project only to add useful detail. Fewer is better: give 1 when one search is enough.
+Answer with JSON: {"queries": ["..."]}`;
+
+async function queries(brief: string, project: string) {
+  if (!(await ollamaUp())) return [brief];
+  try {
+    const a = await chatJSON(QUERY_SYSTEM, `Project: ${project}\nRequest: ${brief}`,
+      { type: "object", properties: { queries: strArr }, required: ["queries"] },
+      (v): v is { queries: string[] } => isStrings((v as { queries: unknown })?.queries));
+    const qs = [...new Set(a.queries.map((q) => q.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, MAX_SEARCHES);
+    return qs.length ? qs : [brief];
+  } catch {
+    return [brief];
+  }
+}
+
+const FIND_SYSTEM = `You compare options for someone, using only the numbered pages you're given.
+fields: 2 to 4 short column names that matter for this request (products: "Price", "Size", "Rating"; services: "Area", "Reviews"; papers: "Authors", "Year", "Journal").
+options: up to 6 real options found in the pages. Each has:
+- name: the product, business, or paper name
+- page: the number of the page it came from
+- values: one short value per field, in the same order ("" when the page doesn't say)
+- why: one short sentence on why it fits the request
+Never invent options, prices, or numbers that aren't in the pages.
+Answer with JSON: {"fields": ["..."], "options": [{"name": "...", "page": 1, "values": ["..."], "why": "..."}]}`;
+
+const ANSWER_SYSTEM = `You answer a question for someone, using the numbered pages you're given.
+Give 3 to 6 points. Each point is 1 or 2 plain sentences, and lists the numbers of the pages it came from.
+Lead with the direct answer. Include safety warnings when they matter. If the pages don't answer it, say so in the first point.
+Answer with JSON: {"points": [{"text": "...", "sources": [1]}]}`;
+
+const LOCAL_ANSWER_SYSTEM = `You answer a question for someone from what you know. Give 3 to 5 points, each 1 or 2 plain sentences.
+Lead with the direct answer. Include safety warnings when they matter. Say when they should check a source or ask a professional.
+Answer with JSON: {"points": [{"text": "...", "sources": []}]}`;
+
+const TURN_SYSTEM = `You reshape the numbered pages and notes you're given into what the person asks for.
+into: one of "tasks" (things to do, with due dates in the text when the pages give them, most urgent first), "citations" (one full citation per source, in the style asked for, APA if none), "table" (a comparison), or "outline" (headings and points).
+title: 1 to 4 words for the result.
+items: the tasks, citations, or outline lines (for a table, []).
+columns and rows: only for a table (each row has one value per column). Otherwise [].
+Only use what's in the pages and notes. Don't invent dates, authors, or numbers.
+Answer with JSON: {"into": "tasks", "title": "...", "items": ["..."], "columns": [], "rows": []}`;
+
+const clip = (t: string, n: number) => t.replace(/\s+/g, " ").trim().slice(0, n);
+
+// Runs a Scout: plan searches → search → read pages → pull out results. Status is saved at each step,
+// so the page can show progress. Only ever started by pressing Run.
+const running = new Set<string>();
+export function queueScout(id: string) {
+  after(() => runScout(id));
+}
+
+async function runScout(id: string) {
+  if (running.has(id)) return;
+  running.add(id);
+  const status = (status: string, note: string | null = null) => db.scout.update({ where: { id }, data: { status, note } });
+  try {
+    const s = await db.scout.findUnique({
+      where: { id },
+      include: { project: { include: { items: { where: { archived: false }, take: 20, orderBy: { createdAt: "desc" } } } } },
+    });
+    if (!s) return;
+    const project = [s.project.title, s.project.goal].filter(Boolean).join(": ");
+    const aiUp = await ollamaUp();
+    if (!aiUp) { await status("failed", "The local AI isn't running. Start Ollama and run it again."); return; }
+    let result: ScoutResult;
+
+    if (s.kind === "turn") {
+      await status("reading", "Reading your sources");
+      const links = [...new Set(s.brief.match(/https?:\/\/[^\s<>"']+/g) ?? [])].slice(0, MAX_PAGES);
+      const pages: Page[] = [];
+      const parts: string[] = [];
+      let skipped = 0;
+      for (const link of links) {
+        const page = await readPage(link);
+        if (!page) { skipped++; continue; }
+        pages.push({ n: pages.length + 1, title: page.title ?? link, link });
+        parts.push(`[${pages.length}] ${page.title ?? link} (${link})\n${page.summary ?? ""}\n${clip(page.text ?? "", 3000)}`);
+      }
+      for (const i of s.project.items.slice(0, 12)) {
+        const page = i.url ? await db.pageCache.findUnique({ where: { url: i.url } }) : null;
+        const name = i.title ?? i.fileName ?? i.url ?? "Note";
+        pages.push({ n: pages.length + 1, title: name, link: i.url ?? "" });
+        parts.push(`[${pages.length}] ${name}${i.url ? ` (${i.url})` : ""}\n${[page?.summary, i.overview].filter(Boolean).join(" ")}\n${clip(page?.text || i.extracted || i.text, 1500)}`);
+      }
+      if (!parts.length) { await status("failed", "Nothing to read. Add sources to the project, or paste links in the brief."); return; }
+      await status("thinking", "Putting it together");
+      const a = await chatJSON(TURN_SYSTEM, `Request: ${s.brief}\n\nPages and notes:\n${parts.join("\n\n").slice(0, 14000)}`, {
+        type: "object",
+        properties: { into: { type: "string", enum: ["tasks", "citations", "table", "outline"] }, title: { type: "string" }, items: strArr, columns: strArr, rows: { type: "array", items: strArr } },
+        required: ["into", "title", "items", "columns", "rows"],
+      }, (v): v is { into: string; title: string; items: string[]; columns: string[]; rows: string[][] } => {
+        const o = v as Record<string, unknown>;
+        return typeof o?.into === "string" && typeof o.title === "string" && isStrings(o.items) && isStrings(o.columns) && Array.isArray(o.rows) && o.rows.every(isStrings);
+      }, { timeoutMs: 240_000 });
+      result = {
+        kind: "turn", into: a.into, title: clip(a.title, 40) || "Result", items: a.items.map((t) => clip(t, 400)).filter(Boolean).slice(0, 30),
+        columns: a.columns.map((c) => clip(c, 40)).slice(0, 6), rows: a.rows.slice(0, 20).map((r) => r.slice(0, 6).map((c) => clip(c, 120))), pages, skipped,
+      };
+    } else {
+      if (!searchReady()) {
+        if (s.kind === "find") { await status("failed", "Web search isn't set up. Add BRIGHTDATA_SERP_ZONE to .env."); return; }
+        // Answer still works without the web, from the local AI alone (and says so).
+        await status("thinking", "Writing it up");
+        const a = await chatJSON(LOCAL_ANSWER_SYSTEM, `Project: ${project}\nQuestion: ${s.brief}`, ANSWER_SCHEMA, isPoints, { timeoutMs: 240_000 });
+        result = { kind: "answer", points: a.points.map((p) => ({ text: clip(p.text, 600), sources: [] })).slice(0, 6), pages: [], skipped: 0, queries: [], local: true };
+      } else {
+        await status("searching", "Searching");
+        const qs = await queries(s.brief, project);
+        const lists = (await Promise.all(qs.map(search))).filter((l): l is Hit[] => !!l);
+        if (!lists.length) { await status("failed", "The search didn't work. Check the Bright Data settings, then run it again."); return; }
+        // Take the top results of each search in turn, without repeats.
+        const hits: Hit[] = [];
+        for (let i = 0; i < 10 && hits.length < MAX_PAGES; i++) {
+          for (const l of lists) if (l[i] && !hits.some((h) => h.link === l[i].link) && hits.length < MAX_PAGES) hits.push(l[i]);
+        }
+        if (!hits.length) { await status("failed", "Nothing found. Try a broader brief."); return; }
+        await status("reading", `Reading ${hits.length} pages`);
+        const read = await Promise.all(hits.map((h) => readPage(h.link)));
+        const skipped = read.filter((p) => !p).length;
+        const pages: Page[] = hits.map((h, i) => ({ n: i + 1, title: read[i]?.title ?? h.title, link: h.link }));
+        // A page that couldn't be read still counts with its search snippet.
+        const text = hits.map((h, i) => `[${i + 1}] ${pages[i].title} (${h.link})\n${h.description}\n${clip(read[i]?.text ?? "", 2500)}`).join("\n\n");
+        await status("thinking", s.kind === "find" ? "Picking the best" : "Writing it up");
+        const user = `Project: ${project}\nRequest: ${s.brief}\n\nPages:\n${text}`.slice(0, 16000);
+        if (s.kind === "find") {
+          const a = await chatJSON(FIND_SYSTEM, user, {
+            type: "object",
+            properties: {
+              fields: strArr,
+              options: { type: "array", items: { type: "object", properties: { name: { type: "string" }, page: { type: "integer" }, values: strArr, why: { type: "string" } }, required: ["name", "page", "values", "why"] } },
+            },
+            required: ["fields", "options"],
+          }, (v): v is { fields: string[]; options: { name: string; page: number; values: string[]; why: string }[] } => {
+            const o = v as { fields: unknown; options: unknown };
+            return isStrings(o?.fields) && Array.isArray(o.options) && o.options.every((x) => typeof x?.name === "string" && typeof x?.page === "number" && isStrings(x?.values) && typeof x?.why === "string");
+          }, { timeoutMs: 240_000 });
+          const fields = a.fields.map((f) => clip(f, 24)).filter(Boolean).slice(0, 4);
+          const options = a.options.filter((o) => pages[o.page - 1] && clip(o.name, 120)).slice(0, 6).map((o) => ({
+            name: clip(o.name, 120), link: pages[o.page - 1].link, values: fields.map((_, i) => clip(o.values[i] ?? "", 60)), why: clip(o.why, 300),
+          }));
+          if (!options.length) { await status("failed", "Nothing that fits was found. Try a broader brief."); return; }
+          result = { kind: "find", fields, options, pages, skipped, queries: qs };
+        } else {
+          const a = await chatJSON(ANSWER_SYSTEM, user, ANSWER_SCHEMA, isPoints, { timeoutMs: 240_000 });
+          const points = a.points.map((p) => ({ text: clip(p.text, 600), sources: [...new Set(p.sources)].filter((n) => pages[n - 1]).slice(0, 4) })).filter((p) => p.text).slice(0, 6);
+          if (!points.length) { await status("failed", "Couldn't write an answer. Try rewording it."); return; }
+          result = { kind: "answer", points, pages, skipped, queries: qs };
+        }
+      }
+    }
+    await db.scout.update({ where: { id }, data: { status: "done", note: null, result: JSON.stringify(result) } });
+  } catch (e) {
+    console.warn("[scout] run failed:", (e as Error).message);
+    await status("failed", "Something went wrong. Run it again.").catch(() => {});
+  } finally {
+    running.delete(id);
+  }
+}
+
+const ANSWER_SCHEMA = {
+  type: "object",
+  properties: { points: { type: "array", items: { type: "object", properties: { text: { type: "string" }, sources: { type: "array", items: { type: "integer" } } }, required: ["text", "sources"] } } },
+  required: ["points"],
+};
+const isPoints = (v: unknown): v is { points: { text: string; sources: number[] }[] } =>
+  Array.isArray((v as { points: unknown })?.points) &&
+  (v as { points: { text: unknown; sources: unknown }[] }).points.every((p) => typeof p?.text === "string" && Array.isArray(p?.sources) && p.sources.every((n) => typeof n === "number"));
+
+// A Scout as the page sees it.
+export const view = (s: { id: string; kind: string; brief: string; status: string; note: string | null; result: string | null; updatedAt: Date }) => ({
+  id: s.id, kind: s.kind, brief: s.brief, status: s.status, note: s.note, updatedAt: s.updatedAt,
+  result: s.result ? (JSON.parse(s.result) as ScoutResult) : null,
+});

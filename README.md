@@ -6,7 +6,7 @@ A home for messy personal projects that runs entirely on your own computer.
 - **Project space** (`/p/...`): one project's writing, tasks, and sources, laid out in a grid you arrange. Projects are either a **Space** (you do the work) or **Auto** (the AI proposes steps).
 - **Brain Dump** (`/inbox`): drop in anything (notes, links, images, documents). Local AI sorts each item into a category and gives it a short title.
 
-Everything is stored in one file on your computer, and the AI runs locally with [Ollama](https://ollama.com). No account and no API key are needed, and nothing leaves your machine except reading the links you add. (One optional exception: if you set up Bright Data, the addresses of sites that block reading are sent to it. See [Settings](#settings-env).)
+Everything is stored in one file on your computer, and the AI runs locally with [Ollama](https://ollama.com). No account and no API key are needed, and nothing leaves your machine except reading the links you add. (Optional exceptions: if you set up Bright Data, the addresses of sites that block reading, and the search words of Scouts you run, are sent to it. See [Settings](#settings-env).)
 
 > Names are working names and may change. They all live in `lib/names.ts`.
 
@@ -109,7 +109,11 @@ Hover over any icon to see what it does.
   - **Auto steps:** after you create an Auto project, the AI works out the steps (this can take a minute). Each step has an explanation and subtasks, and there's always a Troubleshooting step. Click ✓ to keep a step or × to drop it, or **Keep all**. Add your own sections with **+ Section**.
   - **Sources:** paste a link, write a note, or upload a file. It's added to the inbox too. **From inbox** searches the inbox, filters by category, and groups results by category. × takes a source out of the project (it stays in the inbox).
   - **Arranging:** drag a section by the handle in its header onto another section's edge. Left or right puts them side by side, and top or bottom stacks them. ↔ switches a section between half and full width.
-  - **Scouts** (on the left) are coming next. They'll search the web for things the project needs.
+  - **Scouts** (on the left) do one job when you press **Run**. Click **+**, write what you need, and check the kind (it's guessed from your words):
+    - **Find** searches the web and gives options to compare, like fans with their price and size. **+** saves one to Sources.
+    - **Answer** searches the web, reads a few pages, and writes a short answer. Each point links to its page. Without Bright Data it answers from the local AI and says so.
+    - **Turn into** reads your Sources (and any links in the brief) and turns them into tasks, citations, a table, or an outline.
+    - **Add to project** puts the result in a new section. **Send to Scouts** (the magnifier on a task) starts a Scout from that task. Each run uses at most 3 searches and 6 page reads, and the same search isn't paid for twice within a week.
 - **From a tray:** the chip next to the category says which project the item is in. Click it to pick another project or **No project**.
 
 ---
@@ -154,8 +158,9 @@ When you're done, stop the server (Ctrl+C) and go back with `git checkout main`.
 | `OLLAMA_VISION_MODEL` | same as `OLLAMA_MODEL` | Model used to read images. If it isn't installed, the smallest other model that can see images is used. |
 | `BRIGHTDATA_API_KEY` | (none) | Optional. A [Bright Data](https://brightdata.com) API key, used as a backup to read sites that block the app (HTTP 403), like allrecipes. Only the addresses of those pages are sent to Bright Data. It's a last resort: it runs only after a normal read fails, a page that was read is saved and never fetched again, and each page gets at most 2 Bright Data tries. The Terminal shows `[link] read … with Bright Data` each time it's used. |
 | `BRIGHTDATA_ZONE` | `web_unlocker1` | The name of your Web Unlocker zone in Bright Data |
+| `BRIGHTDATA_SERP_ZONE` | (none) | Optional. The name of your SERP API zone (for example `serp_api1`), used by Find and Answer Scouts to search Google. Only the search words are sent. The Terminal shows `[scout] searched … with Bright Data` each time. |
 
-**Setting up Bright Data (optional):** in the Bright Data dashboard, add a **Web Unlocker** zone (the default name is `web_unlocker1`), then copy your API key from **Account settings → API keys**. Put both in `.env` and restart the app. Links that failed before are read again on restart.
+**Setting up Bright Data (optional):** in the Bright Data dashboard, add a **Web Unlocker** zone (the default name is `web_unlocker1`), then copy your API key from **Account settings → API keys**. Put both in `.env` and restart the app. Links that failed before are read again on restart. For Scouts, also add a **SERP API** zone (Light JSON is fine) and put its name in `BRIGHTDATA_SERP_ZONE`.
 
 Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 
@@ -190,6 +195,7 @@ Restart the app (Ctrl + C, then `npm run dev`) after changing a setting.
 | Local AI | [Ollama](https://ollama.com) | Runs models on your Mac. The app asks for JSON in a fixed shape, checks it, and retries once. |
 | Reading documents | [unpdf](https://github.com/unjs/unpdf) | Pulls text out of PDFs so the AI can sort and summarize them |
 | Reading web pages | [Readability](https://github.com/mozilla/readability) + [linkedom](https://github.com/WebReflection/linkedom) | Pulls the article text out of a page, without menus and ads, on your Mac. This is what Firefox's Reader View uses. |
+| Web search for Scouts (optional) | [Bright Data SERP API](https://brightdata.com/products/serp-api) | Only when you run a Find or Answer Scout. Returns Google results as JSON. |
 | Blocked sites (optional) | [Bright Data Web Unlocker](https://brightdata.com/products/web-unlocker) | Only when a site refuses the app (HTTP 403) and a key is set. Fetches the page the way a browser would. |
 | Research papers | [Crossref](https://www.crossref.org) | A free database of journal papers. Gives the real title, journal, year, and often the abstract when a publisher's site blocks reading. |
 | Styling | Plain CSS (`app/globals.css`) | A few colors and shapes; light and dark mode follow your system |
