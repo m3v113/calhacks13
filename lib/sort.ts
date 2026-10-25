@@ -97,16 +97,23 @@ export async function sortItem(id: string) {
   // and files are re-titled each time (e.g. once a vision model can see the image).
   let title = item.kind === "note" || item.titleBy === "user" ? item.title : null;
   let pageTitle = false;
+  let pageReadable = false;
   let pageText: string | null = null;
   const url = item.url ?? (item.kind === "note" || item.kind === "link" ? firstUrl(item.text) : null);
   if (url && (!title || !item.overview)) {
     const page = await readLink(url);
-    if (page.title && !title) { title = page.title; pageTitle = true; }
-    else if (page.title) pageTitle = item.kind === "link";
+    // Older TikTok reads stored the entire caption as PageCache.title. Treat that as
+    // source content, not an authoritative display title, so AI can shorten it.
+    const captionAsTitle =
+      (page.via?.startsWith("tiktok") && page.title && page.text && page.text.startsWith(page.title)) ||
+      (page.via === "brightdata" && page.title && /\bon Instagram:\s*["“]/i.test(page.title));
+    if (page.title && !captionAsTitle && !title) { title = page.title; pageTitle = true; }
+    else if (page.title && !captionAsTitle) pageTitle = item.kind === "link";
     summary = page.summary;
     pageText = page.text || null;
+    pageReadable = Boolean(page.title || page.summary || page.text);
   }
-  const unreadLink = item.kind === "link" && !pageTitle;
+  const unreadLink = item.kind === "link" && !pageReadable;
 
   let name: string | null = null;
   let aiTitle: string | null = null;

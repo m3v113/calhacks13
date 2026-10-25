@@ -9,7 +9,7 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 ## Now
 
 **Working on:** Projects round 2a (PR #8, in review, redesigned after Mehvish's feedback). Next is 2b, the Scouts engine (Find, Answer, Turn into; design approved), using the Bright Data SERP API zone `serp_api1` with Light JSON.
-**Done:** F1 Smart Inbox (PR #5), F3 + F4 first version (PR #6, merged).
+**Done:** F1 Smart Inbox, now called Brain Dump (PR #5, renamed in PR #7), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
 
@@ -61,6 +61,13 @@ Ordered. Feature numbers match the plan.
 ---
 
 ## Log
+
+### 2026-10-24 · TikTok reading and the Brain Dump name (PR #7, by Danielle, merged)
+
+- **TikTok links:** TikTok's oEmbed sometimes gives only an iframe, so the app reads the caption, creator, and cover from the public page's data. `/photo/` links work too. Old cached TikTok reads with the generic "TikTok - Make Your Day" title are read again.
+- **Instagram:** a logged-out error page counts as a failed read, so Bright Data can try it (still at most 2 tries per page).
+- **Titles:** long captions are treated as page text, so the local AI writes a short title instead of copying the caption.
+- **Renamed:** Smart Inbox is now **Brain Dump** (`lib/names.ts`). Mehvish chose to keep the new name.
 
 ### 2026-10-24 · Projects round 2a redesign (PR #8)
 
