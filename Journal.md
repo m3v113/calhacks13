@@ -8,7 +8,7 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** Projects round 2a (PR #8, in review, redesigned after Mehvish's feedback). Next is 2b, the Scouts engine (Find, Answer, Turn into; design approved), using the Bright Data SERP API zone `serp_api1` with Light JSON.
+**Working on:** Projects round 2a (PR #8) and Scouts 2b (PR #9, built on PR #8), both in review. Next is 2c: researched Auto layouts (an Answer Scout feeding the planner).
 **Done:** F1 Smart Inbox, now called Brain Dump (PR #5, renamed in PR #7), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
@@ -36,7 +36,7 @@ Ordered. Feature numbers match the plan.
 - [ ] Check Bright Data on the Mac: paste the allrecipes link, look for `[link] read … with Bright Data` (F1)
 - [ ] Service Scout with Bright Data SERP API + Web Unlocker (F5, Bright Data prize)
 - [ ] Try PR #8 on the Mac with gemma3:4b: make a Space and an Auto project and check the sections and proposed steps
-- [ ] Build Scouts 2b (design approved). Add `BRIGHTDATA_SERP_ZONE="serp_api1"` to `.env`
+- [ ] Try Scouts (PR #9) with `BRIGHTDATA_SERP_ZONE="serp_api1"` in `.env`
 - [ ] Decide on Factory Droid SDK or Fetch.ai for the Scouts (F5)
 - [ ] Status dot shows offline too, not just AI on or off (F6)
 - [ ] Seed script for the demo
@@ -61,6 +61,34 @@ Ordered. Feature numbers match the plan.
 ---
 
 ## Log
+
+### 2026-10-24 · Scouts (PR #9)
+
+Scouts are built, following plan section 3. They run only when you press Run.
+
+- **One engine, three kinds:** Find (options to compare), Answer (short points, each citing its pages), Turn into (sources → tasks, citations, a table, or an outline). The kind is guessed from the brief's words (`lib/scoutKind.ts`) and can be changed.
+- **A run:** the local AI writes 1–3 searches → Bright Data SERP API (`data_format: "parsed_light"`, set per call, so the zone's own format setting doesn't matter) → the top 6 pages read with `readLink` (direct first, Web Unlocker only if blocked, cached) → the local AI pulls out the result. Progress is saved at each step and shown live.
+- **Round 3 feedback** (Mehvish tried Scouts with real search: Find worked):
+  - **Resources in every Auto project:** with the SERP API, one search per new Auto project (`<goal> guide`) gives the Resources section and extra context for the planner. Without it, the AI suggests sites. Links the AI writes (Markdown or bare) become real links, and ones whose page doesn't load become plain text.
+  - **Links open on press** in Writing sections. Clicking didn't work: focusing the editor shows the toolbar, which moves the text before the click lands.
+  - **Sources is now Brain Dump**, the same name as the inbox (`names.inbox`). Old "Sources" sections are renamed on the first page load.
+  - **Auto lag fixed:** in `next dev` each route can load its own copy of `lib/projects.ts`, so the "planning" set the create route filled wasn't the one the project page read. The sets live on `globalThis` now, and the page also checks back while a new Auto project only has its Brain Dump.
+  - **Find tags:** values must look like values (short, and with a number for price, size, rating...). Fields no option has are dropped.
+  - **Slow searches:** 60s limit, and one more try after a timeout or a 5xx.
+  - **Scout kinds** each have a one-line explanation under the switch.
+- **Auto sections are just there:** no more "The AI suggested… Keep all" or ✓/× on each one. Mehvish found having to keep sections confusing. You delete the ones you don't want. Old proposed sections and tasks are marked kept on the first page load.
+- **Costs:** at most 3 searches and 6 page reads per run. Searches are cached for 7 days (`SearchCache`), so a re-run with the same searches costs nothing.
+- **Guards:** results that point at pages that weren't read are dropped. Without `BRIGHTDATA_SERP_ZONE`, Find says web search isn't set up, and Answer uses the local AI only and says so.
+- **Keeping results:** + on a Find option saves it to Sources (and the inbox). Add to project makes a section: Turn-into tasks become a Tasks section, everything else Writing with links.
+- **Send to Scouts:** a magnifier on each task opens a new Scout with the task's text.
+- **New tables:** `Scout` and `SearchCache`. `prisma db push` adds them without touching data.
+
+### 2026-10-24 · Auto layout and creation fixes (PR #8)
+
+- **Auto sections:** the AI now picks each section's shape: a short explanation, key points, facts ("Size: 52 in"), or a checklist (at most 2). Only checklists are Tasks; the rest are Writing. Sections are half width, so they sit side by side. Mehvish found the step-and-subtask layout overwhelming.
+- **Tasks** wrap onto more lines, and AI tasks are no longer cut at 60 characters.
+- **New project box:** a lock on Sources (it can't be removed), and From inbox opens inside the box and scrolls (the Hub was catching the scroll).
+- **Link circles** are smaller (10px), with a bigger invisible area to grab.
 
 ### 2026-10-24 · TikTok reading and the Brain Dump name (PR #7, by Danielle, merged)
 

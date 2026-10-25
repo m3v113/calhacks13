@@ -1,7 +1,9 @@
 import { after } from "next/server";
 import { db } from "./db";
 import { PALETTE } from "./colors";
+import { names } from "./names";
 import { chatJSON, ollamaUp } from "./ollama";
+import { search, searchReady, type Hit } from "./scouts";
 
 export const SECTION_TYPES = ["writing", "tasks", "sources", "step"] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
@@ -11,7 +13,8 @@ type Sec = { type: SectionType; title: string };
 export type Suggestion = { title: string; kind: Kind; sections: Sec[]; by: "ai" | "template" };
 
 const w = (title: string): Sec => ({ type: "writing", title });
-const SOURCES: Sec = { type: "sources", title: "Sources" };
+// The project's own Brain Dump: its links, files, and notes (type "sources").
+const SOURCES: Sec = { type: "sources", title: names.inbox };
 
 // Built-in shapes: used when the AI is off or its answer doesn't fit, and shown to the AI as examples.
 const TEMPLATES: { name: string; kind: Kind; match: RegExp; sections: Sec[] }[] = [
@@ -51,7 +54,7 @@ export function tidySections(list: { type: string; title: string }[]): Sec[] {
   for (const s of list) {
     if (!(SECTION_TYPES as readonly string[]).includes(s.type)) continue;
     if (s.type === "sources" && out.some((x) => x.type === "sources")) continue;
-    out.push({ type: s.type as SectionType, title: capitalize(cleanTitle(s.title)).slice(0, 40) || capitalize(s.type) });
+    out.push(s.type === "sources" ? SOURCES : { type: s.type as SectionType, title: capitalize(cleanTitle(s.title)).slice(0, 40) || capitalize(s.type) });
   }
   const capped = out.slice(0, 10);
   if (!capped.some((s) => s.type === "sources")) capped.push(SOURCES);
@@ -108,9 +111,11 @@ export async function nextProjectColor() {
 }
 
 // Auto projects the AI is building right now (or is about to). Marked before the work starts,
-// so a page that loads right after asking already sees it.
-export const planning = new Set<string>();
-const running = new Set<string>();
+// so a page that loads right after asking already sees it. Kept on globalThis: in development each
+// route can get its own copy of this file, and they must all see the same set.
+const g = globalThis as unknown as { planning?: Set<string>; planRunning?: Set<string> };
+export const planning = (g.planning ??= new Set<string>());
+const running = (g.planRunning ??= new Set<string>());
 export function queuePlan(id: string) {
   planning.add(id);
   after(() => planAuto(id));
@@ -147,23 +152,70 @@ Give 3 to 6 sections, in a sensible order. Pick each section's title and form to
 Use at most 2 checklists. Keep every item under 15 words, and plain.
 Titles are 1 to 4 words and fit this project (e.g. "How it works", "What to buy", "Install", "If it wobbles").
 Include a section for common problems and fixes. When hiring help makes sense, say who to call.
+RESOURCES
 Use the context you're given (pages, notes, saved items) when it helps, and don't invent facts like prices, names, or dates.
 Answer with JSON: {"sections": [{"title": "...", "form": "text", "text": "...", "items": []}]}`;
 
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const clean = (t: string) => t.replace(/^[-•*\d.)\s]+/, "").replace(/\s+/g, " ").trim();
 
+// The small model sometimes writes Markdown (**bold**, "* " bullets) and long paragraphs. Bold becomes
+// <strong>, bullets inside the text become list items, and the text keeps its first 4 sentences.
+const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+// Markdown links ([name](url), or [url](url)) and bare addresses become real links.
+const linkify = (h: string) => h
+  .replace(/\[([^\]]+)\]\s*\((https?:\/\/[^)\s]+)\)/g, (_, name: string, url: string) => `<a href="${url}">${/^https?:/.test(name) ? host(name) : name}</a>`)
+  .replace(/(^|[\s(])(https?:\/\/[^\s<)\]]+[^\s<)\].,;])/g, (_, pre: string, url: string) => `${pre}<a href="${url}">${host(url)}</a>`);
+const inline = (t: string) => linkify(esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*\*/g, ""));
+function splitText(text: string) {
+  const [intro, ...bullets] = text.split(/\s+\*\s+(?=\S)/);
+  // Sentences end with . ! or ? and a space, so the dots in a web address don't count.
+  const sentences = intro.split(/(?<=[.!?])\s+/);
+  return { intro: sentences.slice(0, 4).join(" ").trim(), bullets: bullets.map(clean).filter(Boolean) };
+}
+
 // A planned section as one of ours: text, points, and facts are Writing (formatted); checklists are Tasks.
 function toSection(s: PlanSection) {
-  const items = s.items.map(clean).filter(Boolean).slice(0, 8).map((t) => t.slice(0, 300));
-  const text = s.text.replace(/\s+/g, " ").trim().slice(0, 1200);
+  const raw = s.text.replace(/\s+/g, " ").trim().slice(0, 1500);
+  const { intro, bullets } = splitText(raw);
+  const items = [...bullets, ...s.items.map(clean)].filter(Boolean).slice(0, 8)
+    .map((t) => t.replace(/^label:\s*/i, "").replace(/\*\*/g, "").slice(0, 300));
   const title = cleanTitle(s.title).slice(0, 40);
   if (s.form === "checklist" && items.length) return { title, type: "tasks", notes: null, tasks: items };
-  const fact = (t: string) => { const m = t.match(/^([^:]{1,40}):\s*(.+)$/); return m ? `<strong>${esc(m[1])}:</strong> ${esc(m[2])}` : esc(t); };
-  const list = items.length ? `<ul>${items.map((t) => `<li><p>${s.form === "facts" ? fact(t) : esc(t)}</p></li>`).join("")}</ul>` : "";
-  const notes = `${text ? `<p>${esc(text)}</p>` : ""}${list}`;
+  const fact = (t: string) => { const m = t.match(/^([^:]{1,40}):\s+(.+)$/); return m ? `<strong>${esc(m[1])}:</strong> ${inline(m[2])}` : inline(t); };
+  const list = items.length ? `<ul>${items.map((t) => `<li><p>${s.form === "facts" || bullets.length ? fact(t) : inline(t)}</p></li>`).join("")}</ul>` : "";
+  const notes = `${intro ? `<p>${inline(intro)}</p>` : ""}${list}`;
   return notes ? { title, type: "writing", notes, tasks: [] } : null;
 }
+
+// Links the AI wrote can be made up. A link whose page doesn't load is turned back into plain text.
+async function alive(url: string) {
+  const u = url.replace(/&amp;/g, "&");
+  try {
+    if (/(^|\.)(youtube\.com|youtu\.be)$/.test(new URL(u).hostname)) {
+      return (await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(u)}`, { signal: AbortSignal.timeout(6000) })).ok;
+    }
+    const r = await fetch(u, { redirect: "follow", headers: { "user-agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(6000) });
+    return r.status < 400 || r.status === 403; // 403: the site blocks apps, but the page is there
+  } catch {
+    return false;
+  }
+}
+async function checkLinks(html: string) {
+  const urls = [...new Set([...html.matchAll(/<a href="([^"]+)">/g)].map((m) => m[1]))].slice(0, 12);
+  const dead = new Set((await Promise.all(urls.map(async (u) => ((await alive(u)) ? null : u)))).filter(Boolean));
+  return dead.size ? html.replace(/<a href="([^"]+)">(.*?)<\/a>/g, (all, u: string, name: string) => (dead.has(u) ? name : all)) : html;
+}
+
+// Every Auto project gets a Resources section: real pages from one web search when Bright Data's
+// SERP API is set up. That search also gives the AI fresh context to plan from.
+async function resourcesFor(title: string, goal: string | null) {
+  if (!searchReady()) return null;
+  const hits = await search(`${goal ?? title} guide`.slice(0, 120));
+  return Array.isArray(hits) && hits.length ? hits.slice(0, 6) : null;
+}
+const resourcesHtml = (hits: Hit[]) =>
+  `<ul>${hits.map((h) => `<li><p><a href="${esc(h.link)}">${esc(h.title)}</a>${h.description ? ` · ${esc(h.description.slice(0, 160))}` : ""}</p></li>`).join("")}</ul>`;
 
 // What the AI reads for an Auto project: the goal, the context you gave, and the project's sources (with their page text).
 async function planContext(id: string) {
@@ -182,25 +234,33 @@ async function planContext(id: string) {
   ].filter(Boolean).join("\n\n").slice(0, 9000);
 }
 
-// Auto projects: the AI writes the sections, each in the shape that fits it. They show as proposed until you keep them.
+// Auto projects: the AI writes the sections, each in the shape that fits it. You delete the ones you don't want.
 async function planAuto(id: string) {
   if (running.has(id)) return;
   running.add(id);
   try {
-    const p = await db.project.findUnique({ where: { id }, select: { kind: true } });
+    const p = await db.project.findUnique({ where: { id }, select: { kind: true, title: true, goal: true } });
     if (!p || p.kind !== "auto" || !(await ollamaUp())) return;
+    const found = await resourcesFor(p.title, p.goal);
     // Give the project's links a moment to be read, so their text is there to use.
     for (let i = 0; i < 20 && (await db.item.count({ where: { projectId: id, sortedBy: "pending" } })); i++) await new Promise((r) => setTimeout(r, 1500));
     const context = await planContext(id);
     if (!context) return;
-    const a = await chatJSON(PLAN_SYSTEM, context, PLAN_SCHEMA, isPlan, { timeoutMs: 240_000 });
-    const sections = a.sections.map(toSection).filter((s) => s && s.title).slice(0, 7) as NonNullable<ReturnType<typeof toSection>>[];
+    const web = found ? `\n\nFrom a web search:\n${found.map((h) => `- ${h.title}: ${h.description}`).join("\n")}` : "";
+    // With a web search, Resources comes from it. Without one, the AI suggests well-known sites (checked below).
+    const system = PLAN_SYSTEM.replace("RESOURCES", found
+      ? "Don't write a resources or links section: one is added from a web search."
+      : `End with a "Resources" section (form "points") listing 2 to 4 well-known sites or guides, each "Name: https://...".`);
+    const a = await chatJSON(system, context + web, PLAN_SCHEMA, isPlan, { timeoutMs: 240_000 });
+    const sections = (a.sections.map(toSection).filter((s) => s && s.title && !(found && /^(resources?|links?)$/i.test(s.title))) as NonNullable<ReturnType<typeof toSection>>[]).slice(0, 7);
+    for (const s of sections) if (s.notes) s.notes = await checkLinks(s.notes);
+    if (found) sections.push({ title: "Resources", type: "writing", notes: resourcesHtml(found), tasks: [] });
     // The new sections go before Sources and anything you added.
     await db.section.updateMany({ where: { projectId: id }, data: { order: { increment: sections.length } } });
     for (const [order, s] of sections.entries()) {
       await db.section.create({
         data: {
-          projectId: id, type: s.type, title: s.title, order, span: 1, proposed: true, notes: s.notes,
+          projectId: id, type: s.type, title: s.title, order, span: 1, notes: s.notes,
           tasks: { create: s.tasks.map((text, i) => ({ text, order: i })) },
         },
       });
@@ -215,16 +275,21 @@ async function planAuto(id: string) {
 
 // Databases from the first version of projects: notes → writing, items → sources, and
 // "help nearby" sections go away (Scouts replace them). Every project gets a Sources section.
-let upgraded = false;
 export async function upgradeSections() {
-  if (upgraded) return;
-  upgraded = true;
+  const gu = globalThis as unknown as { upgraded?: boolean };
+  if (gu.upgraded) return;
+  gu.upgraded = true;
   await db.section.updateMany({ where: { type: "notes" }, data: { type: "writing" } });
   await db.section.updateMany({ where: { type: "items" }, data: { type: "sources" } });
   await db.section.deleteMany({ where: { type: "providers" } });
+  // The Sources section is now called Brain Dump, like the inbox it belongs to.
+  await db.section.updateMany({ where: { type: "sources", title: "Sources" }, data: { title: names.inbox } });
+  // AI sections used to wait for you to keep them. Now they're just there.
+  await db.section.updateMany({ where: { proposed: true }, data: { proposed: false } });
+  await db.task.updateMany({ where: { proposed: true }, data: { proposed: false } });
   const missing = await db.project.findMany({ where: { sections: { none: { type: "sources" } } }, select: { id: true } });
   for (const { id } of missing) {
     const last = await db.section.findFirst({ where: { projectId: id }, orderBy: { order: "desc" }, select: { order: true } });
-    await db.section.create({ data: { projectId: id, type: "sources", title: "Sources", order: (last?.order ?? -1) + 1 } });
+    await db.section.create({ data: { projectId: id, type: "sources", title: names.inbox, order: (last?.order ?? -1) + 1 } });
   }
 }

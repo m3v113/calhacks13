@@ -28,7 +28,7 @@ export default function Writing({ value, onSave, label }: { value: string; onSav
     if (html !== saved.current) { saved.current = html; onSave(html); }
   };
   const editor = useEditor({
-    extensions: [StarterKit.configure({ heading: { levels: [1, 2] }, link: { openOnClick: false } })],
+    extensions: [StarterKit.configure({ heading: { levels: [1, 2] }, link: { openOnClick: false, autolink: true, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" } } })],
     content: toHtml(value),
     immediatelyRender: false,
     editorProps: { attributes: { class: "writing-text", "aria-label": label, "data-placeholder": "Write here" } },
@@ -67,7 +67,14 @@ export default function Writing({ value, onSave, label }: { value: string; onSav
           </button>
         ))}
       </div>
-      <EditorContent editor={editor} />
+      {/* Pressing a link opens it in a new tab, instead of putting the cursor in it. (On press, not on click:
+          focusing the editor shows the toolbar, which moves the text before the click lands.) */}
+      <div onMouseDownCapture={(e) => {
+        const href = e.button === 0 ? (e.target as HTMLElement).closest("a")?.href : null;
+        if (href) { e.preventDefault(); e.stopPropagation(); window.open(href, "_blank", "noopener,noreferrer"); }
+      }}>
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }

@@ -69,6 +69,7 @@ model Project {
 
   items    Item[]
   sections Section[]
+  scouts   Scout[]
   linksOut ProjectLink[] @relation("from")
   linksIn  ProjectLink[] @relation("to")
 }
@@ -128,5 +129,27 @@ model PageCache {
   image     String? // the page's preview picture (og:image or a video thumbnail)
   via       String? // how it was read: "direct", "brightdata", "oembed", or "crossref"
   unlockTries Int    @default(0) // Bright Data requests made for this page (it's paid, so capped)
+  fetchedAt DateTime @default(now())
+}
+
+// A Scout: a brief you run on demand. It searches and reads the web (or the project's sources)
+// and gives back results you can keep.
+model Scout {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind      String // "find" (options to compare) | "answer" (a write-up with citations) | "turn" (reshape pages into tasks, citations, a table)
+  brief     String
+  status    String   @default("idle") // idle | searching | reading | thinking | done | failed
+  note      String? // progress, or what went wrong
+  result    String? // JSON, its shape depends on the kind
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Search results from the Bright Data SERP API, so the same search isn't paid for twice.
+model SearchCache {
+  query     String   @id
+  results   String // JSON: [{ title, link, description }]
   fetchedAt DateTime @default(now())
 }
