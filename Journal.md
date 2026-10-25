@@ -64,10 +64,11 @@ Ordered. Feature numbers match the plan.
 
 ## Log
 
-### 2026-10-25 · Done group in Tasks (PR #12)
+### 2026-10-25 · Done group in Tasks, no lock icon (PR #12)
 
 - Checked-off tasks used to just disappear from Tasks. Now the last 10 (Pantry items and project tasks that had a date, time, or priority) show in a **Done** group at the bottom, newest first, struck through. Unchecking one puts it back in its group.
 - New field `doneAt` on `Item` and `Task`, set when something is checked off and cleared when it's unchecked. Things checked off before this change have no `doneAt`, so they don't show in Done. `npm run dev` adds the field with `prisma db push`, so restart it once.
+- **No lock icon** next to Project Dump in the New project box; the dashed row already sets it apart.
 
 ### 2026-10-25 · Typed dates and times, new projects stay on the Hub (PR #11)
 
