@@ -56,7 +56,7 @@ export function markBroken(name: string) {
   broken.add(name);
 }
 
-type Opts = { model?: string; images?: string[] };
+type Opts = { model?: string; images?: string[]; timeoutMs?: number };
 
 // One chat call that must return JSON matching `schema`. Retries once on bad JSON.
 export async function chatJSON<T>(system: string, user: string, schema: object, check: (v: unknown) => v is T, opts: Opts = {}): Promise<T> {
@@ -71,7 +71,7 @@ export async function chatJSON<T>(system: string, user: string, schema: object, 
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model: opts.model ?? MODEL, messages, format: schema, stream: false, options: { temperature: 0 } }),
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 60000),
     });
     if (!r.ok) throw new Error(`ollama ${r.status}: ${(await r.text()).slice(0, 300)}`);
     const body = await r.json();

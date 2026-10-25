@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { SECTION_TYPES } from "@/lib/projects";
 
-// Add a section to the end of a project: { type, title }.
+// Add a section to the end of a project: { type, title }. Writing sections start full width.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
@@ -10,7 +10,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const last = await db.section.findFirst({ where: { projectId: id }, orderBy: { order: "desc" }, select: { order: true } });
   try {
     const section = await db.section.create({
-      data: { projectId: id, type: body.type, title: typeof body.title === "string" && body.title.trim() ? body.title.trim().slice(0, 40) : body.type, order: (last?.order ?? -1) + 1 },
+      data: {
+        projectId: id, type: body.type, order: (last?.order ?? -1) + 1, span: body.type === "writing" ? 2 : 1,
+        title: typeof body.title === "string" && body.title.trim() ? body.title.trim().slice(0, 40) : body.type,
+      },
       include: { tasks: true },
     });
     return NextResponse.json(section);

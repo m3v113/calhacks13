@@ -57,3 +57,18 @@ export const CheckIcon = () => (
 export const GripIcon = () => (
   <svg {...p}><circle cx="9" cy="6" r="1" fill="currentColor" /><circle cx="15" cy="6" r="1" fill="currentColor" /><circle cx="9" cy="12" r="1" fill="currentColor" /><circle cx="15" cy="12" r="1" fill="currentColor" /><circle cx="9" cy="18" r="1" fill="currentColor" /><circle cx="15" cy="18" r="1" fill="currentColor" /></svg>
 );
+export const WidthIcon = () => (
+  <svg {...p}><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4" /></svg>
+);
+export const UploadIcon = () => (
+  <svg {...p}><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></svg>
+);
+export const EditIcon = () => (
+  <svg {...p}><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14 6l4 4" /></svg>
+);
+export const LockIcon = () => (
+  <svg {...p}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+);
+export const ScoutIcon = () => (
+  <svg {...p}><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
+);

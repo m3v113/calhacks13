@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useInbox } from "@/lib/useInbox";
 import { useProjects } from "@/lib/useProjects";
-import { Card, NewProject } from "./Projects";
+import { Card, Lines, NewProject, type Draft } from "./Projects";
 import { Categories, InboxList } from "./Inbox";
 import { PanelIcon } from "./Icons";
 import Nav from "./Nav";
@@ -33,6 +33,34 @@ export default function Hub() {
   const [dragging, setDragging] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
+  // A line being drawn from a card to another one, in canvas coordinates.
+  const [draft, setDraft] = useState<Draft | null>(null);
+
+  const toCanvas = (clientX: number, clientY: number) => {
+    const r = canvas.current!.getBoundingClientRect();
+    return { x: (clientX - r.left - view.x) / view.z, y: (clientY - r.top - view.y) / view.z };
+  };
+  const connect = (from: string, e: React.PointerEvent) => {
+    // Where the line ends, the cards close to it (they show their circles), and the card under it.
+    const at = (cx: number, cy: number): Draft => {
+      const { x, y } = toCanvas(cx, cy);
+      const near = projects.projects.filter((p) =>
+        Math.hypot(Math.max(p.canvasX - x, 0, x - p.canvasX - p.cardW), Math.max(p.canvasY - y, 0, y - p.canvasY - p.cardH)) < 160).map((p) => p.id);
+      const to = (document.elementFromPoint(cx, cy) as HTMLElement | null)?.closest<HTMLElement>("[data-card]")?.dataset.card ?? null;
+      return { from, x, y, near, to: to === from ? null : to };
+    };
+    setDraft(at(e.clientX, e.clientY));
+    const move = (ev: PointerEvent) => setDraft(at(ev.clientX, ev.clientY));
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setDraft(null);
+      const to = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-card]")?.dataset.card;
+      if (to && to !== from) projects.connect(from, to);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   useEffect(() => {
     setView(stored(KEY, { x: 0, y: 0, z: 1 }));
@@ -46,6 +74,8 @@ export default function Hub() {
     const el = canvas.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      // The New project box scrolls normally.
+      if ((e.target as HTMLElement).closest(".new-project-box") && !e.ctrlKey) return;
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const r = el.getBoundingClientRect();
@@ -93,13 +123,14 @@ export default function Hub() {
       >
         <div className="float"><Nav ai={inbox.ai} vision={inbox.vision} /></div>
         <div className="layer" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
-          {projects.projects.map((p) => <Card key={p.id} project={p} projects={projects} view={view} onLinked={inbox.refresh} />)}
+          <Lines projects={projects} draft={draft} />
+          {projects.projects.map((p) => <Card key={p.id} project={p} projects={projects} view={view} draft={draft} onConnect={connect} />)}
         </div>
         {/* New cards go near the middle of what's on screen, nudged so they don't stack exactly. */}
-        <NewProject projects={projects} at={() => {
+        <NewProject projects={projects} inbox={inbox} at={() => {
           const r = canvas.current!.getBoundingClientRect();
           const n = projects.projects.length;
-          return { x: (r.width / 2 - view.x) / view.z - 90 + (n % 5) * 24, y: (r.height / 2 - view.y) / view.z - 24 + (n % 5) * 24 };
+          return { x: (r.width / 2 - view.x) / view.z - 130 + (n % 5) * 24, y: (r.height / 2 - view.y) / view.z - 60 + (n % 5) * 24 };
         }} />
       </div>
       <button className="toggle" onClick={() => setPanel(!panel)} aria-label={panel ? "Hide inbox" : "Show inbox"}>
