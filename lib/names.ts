@@ -5,4 +5,7 @@ export const names = {
   projectDump: "Project Dump",
   tasks: "Tasks",
   hub: "Hub",
+  // The two kinds of project (stored as "space" and "auto").
+  space: "Manual",
+  auto: "Assisted",
 };
