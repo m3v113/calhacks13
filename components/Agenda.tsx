@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { DueChip, isLate, type Due } from "./Due";
-import { CheckIcon } from "./Icons";
+import { DuePicker, isLate, type Due } from "./Due";
+import { CheckIcon, PlusIcon } from "./Icons";
 
 type Entry = Due & { kind: "item" | "task"; id: string; text: string; color: string | null; project: { id: string; title: string; color: string | null } | null };
 
@@ -15,9 +15,16 @@ const GROUPS: { name: string; test: (e: Entry) => boolean }[] = [
   { name: "No date", test: (e) => !e.dueDate },
 ];
 
+const NONE: Due = { dueDate: null, dueTime: null, priority: null };
+const send = (url: string, method: string, body: object) =>
+  fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
 // The Tasks bar: Brain Dump items and project tasks with a date, time, or priority, soonest first.
+// A task added here goes to the Brain Dump, due today unless you pick a date.
 export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
   const [list, setList] = useState<Entry[] | null>(null);
+  const [text, setText] = useState("");
+  const [due, setDue] = useState<Due>(NONE);
   const load = useCallback(async () => {
     const r = await fetch("/api/agenda", { cache: "no-store" }).catch(() => null);
     if (r?.ok) setList(await r.json());
@@ -27,14 +34,33 @@ export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
     const t = setInterval(load, 15000);
     return () => clearInterval(t);
   }, [load]);
+  const url = (e: Entry) => `/api/${e.kind === "item" ? "items" : "tasks"}/${e.id}`;
   const check = (e: Entry) => {
     setList((l) => l?.filter((x) => x.id !== e.id) ?? l);
-    fetch(`/api/${e.kind === "item" ? "items" : "tasks"}/${e.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ done: true }) });
+    send(url(e), "PATCH", { done: true });
+  };
+  const change = (e: Entry, d: Partial<Due>) => {
+    setList((l) => l?.map((x) => (x.id === e.id ? { ...x, ...d } : x)) ?? l);
+    send(url(e), "PATCH", d).then(load);
+  };
+  const add = async () => {
+    const t = text.trim();
+    if (!t) return;
+    setText("");
+    setDue(NONE);
+    await send("/api/items", "POST", { text: t, ...due, dueDate: due.dueDate ?? day(0) });
+    load();
   };
   if (!list) return null;
-  if (!list.length) return <p className="muted agenda-none">Give a Brain Dump item or a project task a date or priority, and it shows here.</p>;
   return (
     <div className="agenda">
+      <div className="add-task agenda-add">
+        <PlusIcon />
+        <input value={text} placeholder="Add a task" aria-label="Add a task" onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) add(); if (e.key === "Escape") setText(""); }} />
+        <DuePicker due={due} onChange={(d) => setDue({ ...due, ...d })} />
+      </div>
+      {!list.length && <p className="muted agenda-none">Give a Brain Dump item or a project task a date or priority, and it shows here.</p>}
       {GROUPS.map((g) => {
         const rows = list.filter(g.test);
         return rows.length > 0 && (
@@ -48,7 +74,7 @@ export default function Agenda({ onOpen }: { onOpen: (id: string) => void }) {
                     {e.kind === "item" ? <button className="agenda-text" onClick={() => onOpen(e.id)}>{e.text}</button>
                       : <Link className="agenda-text" href={`/p/${e.project?.id}`}>{e.text}</Link>}
                     <div className="agenda-meta">
-                      <DueChip due={e} />
+                      <DuePicker due={e} onChange={(d) => change(e, d)} />
                       {e.project && <span className="agenda-project"><span className="dot square" style={{ background: e.project.color ?? "var(--muted)" }} />{e.project.title}</span>}
                     </div>
                   </div>

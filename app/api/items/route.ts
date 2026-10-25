@@ -3,6 +3,7 @@ import { db, ensureSeed } from "@/lib/db";
 import { firstUrl } from "@/lib/link";
 import { MAX_BYTES, extractText, saveUpload } from "@/lib/files";
 import { sortItem, sweep } from "@/lib/sort";
+import { dueFields } from "@/lib/due";
 
 // The Brain Dump: categories (with counts) and items that aren't archived. Items in a project live in that
 // project's own Brain Dump, so they aren't listed here; the main one holds what's still to be sorted into projects.
@@ -20,7 +21,7 @@ export async function GET() {
   });
 }
 
-// Add a note or link (JSON: { text, kind?, projectId? }) or a file (form data: file, projectId?).
+// Add a note or link (JSON: { text, kind?, projectId?, dueDate?, dueTime?, priority? }) or a file (form data: file, projectId?).
 // With a projectId, the item is also one of that project's sources.
 export async function POST(req: Request) {
   if ((req.headers.get("content-type") ?? "").includes("multipart/form-data")) {
@@ -37,7 +38,8 @@ export async function POST(req: Request) {
     return NextResponse.json(item, { status: 201 });
   }
 
-  const { text, kind, projectId, title, summary } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const { text, kind, projectId, title, summary } = body;
   const clean = typeof text === "string" ? text.trim().slice(0, 10_000) : "";
   if (!clean) return NextResponse.json({ error: "empty" }, { status: 400 });
   const url = firstUrl(clean);
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
   const given = isLink && typeof title === "string" && title.trim() && typeof summary === "string" && summary.trim()
     ? { title: title.trim().slice(0, 200), titleBy: "user", summary: summary.trim().slice(0, 1200), overview: summary.trim().slice(0, 1200), overviewBy: "user" }
     : {};
-  const item = await db.item.create({ data: { kind: isLink ? "link" : "note", text: clean, url, projectId: await projectOf(projectId), ...given } });
+  const item = await db.item.create({ data: { kind: isLink ? "link" : "note", text: clean, url, projectId: await projectOf(projectId), ...given, ...dueFields(body) } });
   after(() => sortItem(item.id));
   return NextResponse.json(item, { status: 201 });
 }

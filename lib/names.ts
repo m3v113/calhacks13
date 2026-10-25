@@ -2,5 +2,7 @@
 export const names = {
   app: "Project Scaffold",
   inbox: "Brain Dump",
+  projectDump: "Project Dump",
+  tasks: "Tasks",
   hub: "Hub",
 };

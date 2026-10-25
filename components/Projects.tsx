@@ -274,7 +274,7 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
     setDragging(from);
     const move = (ev: PointerEvent) => {
       const rows = Array.from(list.current?.children ?? []) as HTMLElement[];
-      // The Brain Dump always stays last.
+      // The Project Dump always stays last.
       const last = order.findIndex((x) => x.type === "sources");
       const to = Math.min(rows.filter((r, j) => j !== from && r.getBoundingClientRect().top + r.offsetHeight / 2 < ev.clientY).length, last < 0 ? order.length - 1 : last - 1);
       if (to === from) return;
@@ -307,23 +307,23 @@ export function NewProject({ projects, inbox, at }: { projects: Projects; inbox:
             <>
               <ul className="np-sections" ref={list}>
                 {s.sections.map((sec, i) => sec.type === "sources" ? (
-                  // The project's own Brain Dump: always there, so it's shown apart, not as a section to edit.
+                  // The Project Dump: always there, so it's shown apart, not as a section to edit.
                   <li key={sec.key ?? i} className="np-dump">
                     <span className="np-lock" aria-hidden="true"><LockIcon /></span>
-                    <span className="np-dump-name">{names.inbox}</span>
+                    <span className="np-dump-name">{names.projectDump}</span>
                     <span className="np-dump-text">This project&apos;s own links, notes, and files</span>
                   </li>
                 ) : (
                   <li key={sec.key ?? i} className={dragging === i ? "lifted" : ""}>
                     <span className="np-grip" aria-label="Drag to reorder" onPointerDown={startMove(i)}><GripIcon /></span>
-                    {sec.type === "sources" ? <span className="np-type">{names.inbox}</span> : (
+                    {sec.type === "sources" ? <span className="np-type">{names.projectDump}</span> : (
                       <select className="np-type" value={sec.type} aria-label="Section type" onChange={(e) => setSection(i, { type: e.target.value })}>
                         {TYPES.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
                       </select>
                     )}
                     <input value={sec.title} aria-label="Section name" onChange={(e) => setSection(i, { title: e.target.value })} />
                     {sec.type === "sources"
-                      ? <span className="np-lock" aria-label={`Every project has a ${names.inbox}`} data-tip={`Every project has a ${names.inbox}`}><LockIcon /></span>
+                      ? <span className="np-lock" aria-label={`Every project has a ${names.projectDump}`} data-tip={`Every project has a ${names.projectDump}`}><LockIcon /></span>
                       : <button aria-label={`Remove ${sec.title}`} onClick={() => setS({ ...s, sections: s.sections.filter((_, j) => j !== i) })}><CloseIcon /></button>}
                   </li>
                 ))}

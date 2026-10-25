@@ -16,8 +16,8 @@ type Sec = { type: SectionType; title: string };
 export type Suggestion = { title: string; kind: Kind; sections: Sec[]; by: "ai" | "template" };
 
 const w = (title: string): Sec => ({ type: "writing", title });
-// The project's own Brain Dump: its links, files, and notes (type "sources").
-const SOURCES: Sec = { type: "sources", title: names.inbox };
+// The Project Dump: the project's own links, files, and notes (type "sources").
+const SOURCES: Sec = { type: "sources", title: names.projectDump };
 
 // Built-in shapes: used when the AI is off or its answer doesn't fit, and shown to the AI as examples.
 const TEMPLATES: { name: string; kind: Kind; match: RegExp; sections: Sec[] }[] = [
@@ -97,7 +97,7 @@ Answer with JSON: {"title": "...", "kind": "space", "sections": [{"type": "writi
 export async function suggest(goal: string): Promise<Suggestion> {
   if (!(await ollamaUp())) return fromTemplate(goal);
   try {
-    const a = await chatJSON(SYSTEM, `Project: ${goal}`, SCHEMA, isAnswer);
+    const a = await chatJSON(SYSTEM, `Project: ${goal}`, SCHEMA, isAnswer, { maxTokens: 400 });
     const sections = tidySections(a.sections);
     const title = cleanTitle(a.title);
     if (!title || sections.length < 2) return fromTemplate(goal);
@@ -147,7 +147,7 @@ const PLAN_SCHEMA = {
   required: ["sections"],
 };
 const PLAN_SYSTEM = `You lay out a personal project so someone can understand it and get it done, without feeling overwhelmed.
-Give 3 to 5 parts, in a sensible order. Pick each part's title and form to best fit what it holds:
+Give 3 or 4 parts, in a sensible order. Pick each part's title and form to best fit what it holds:
 - "text": a short explanation (text: 1 to 3 sentences; items: []). For what this is, how it works, or safety notes.
 - "points": key things to know (items: 2 to 5 short points; text: "").
 - "facts": specs, sizes, or numbers to look for (items: 2 to 5, each "Label: value"; text: "").
@@ -249,7 +249,7 @@ async function suggestSites(project: string, have: Hit[]): Promise<Hit[]> {
       type: "object",
       properties: { sites: { type: "array", items: { type: "object", properties: { name: { type: "string" }, url: { type: "string" }, about: { type: "string" } }, required: ["name", "url", "about"] } } },
       required: ["sites"],
-    }, (v): v is { sites: Site[] } => Array.isArray((v as { sites: unknown })?.sites) && (v as { sites: Site[] }).sites.every((x) => typeof x?.name === "string" && typeof x?.url === "string" && typeof x?.about === "string"));
+    }, (v): v is { sites: Site[] } => Array.isArray((v as { sites: unknown })?.sites) && (v as { sites: Site[] }).sites.every((x) => typeof x?.name === "string" && typeof x?.url === "string" && typeof x?.about === "string"), { maxTokens: 500 });
     const fresh = a.sites.filter((x) => /^https?:\/\/[^\s]+$/.test(x.url) && !have.some((h) => h.link === x.url)).slice(0, 4);
     const ok = await Promise.all(fresh.map((x) => alive(x.url)));
     return fresh.filter((_, i) => ok[i]).map((x) => ({ title: clean(x.name).slice(0, 120), link: x.url, description: clean(x.about).slice(0, 240) }));
@@ -322,36 +322,47 @@ async function planAuto(id: string) {
     const p = await db.project.findUnique({ where: { id }, select: { kind: true, title: true, goal: true } });
     if (!p || p.kind !== "auto" || !(await ollamaUp())) return;
     const found = await resourcesFor(p.title, p.goal);
+    // Search results show right away, while the AI writes the rest.
+    if (found) await addSections(id, [{ title: "Resources", type: "resources", span: 1, notes: JSON.stringify(found), tasks: [] }]);
     // Give the project's links a moment to be read, so their text is there to use.
-    for (let i = 0; i < 20 && (await db.item.count({ where: { projectId: id, sortedBy: "pending" } })); i++) await new Promise((r) => setTimeout(r, 1500));
+    for (let i = 0; i < 8 && (await db.item.count({ where: { projectId: id, sortedBy: "pending" } })); i++) await new Promise((r) => setTimeout(r, 1000));
     const context = await planContext(id);
     if (!context) return;
     const web = found ? `\n\nFrom a web search:\n${found.hits.map((h) => `- ${h.title}: ${h.description}`).join("\n")}` : "";
-    const a = await chatJSON(PLAN_SYSTEM, context + web, PLAN_SCHEMA, isPlan, { timeoutMs: 240_000 });
+    const a = await chatJSON(PLAN_SYSTEM, context + web, PLAN_SCHEMA, isPlan, { timeoutMs: 240_000, maxTokens: 1200 });
     const parts = (a.sections.map(toPart).filter((s) => s && s.title && !/^(resources?|links?)$/i.test(s.title)) as NonNullable<ReturnType<typeof toPart>>[]).slice(0, 6);
     const overview = await checkLinks(parts.filter((s) => s.html).map((s) => `<h2>${esc(s.title)}</h2>${s.html}`).join(""));
     const tasks = parts.flatMap((s) => s.tasks).slice(0, 12);
-    const resources = found ?? { query: resourcesQuery(p.title, p.goal), start: 0, hits: await suggestSites([p.title, p.goal].filter(Boolean).join(": "), []) };
-    const sections = [
+    const planned = [
       overview && { title: "Overview", type: "writing", span: 2, notes: overview, tasks: [] as string[] },
       tasks.length && { title: "To do", type: "tasks", span: 1, notes: null, tasks },
-      resources.hits.length && { title: "Resources", type: "resources", span: 1, notes: JSON.stringify(resources), tasks: [] as string[] },
-    ].filter(Boolean) as { title: string; type: string; span: number; notes: string | null; tasks: string[] }[];
-    // The new sections go before the Brain Dump and anything you added.
-    await db.section.updateMany({ where: { projectId: id }, data: { order: { increment: sections.length } } });
-    for (const [order, s] of sections.entries()) {
-      await db.section.create({
-        data: {
-          projectId: id, type: s.type, title: s.title, order, span: s.span, notes: s.notes,
-          tasks: { create: s.tasks.map((text, i) => ({ text, order: i })) },
-        },
-      });
+    ].filter(Boolean) as NewSection[];
+    await addSections(id, planned);
+    // Without web search, the AI suggests sites it knows, once the plan is in.
+    if (!found) {
+      const hits = await suggestSites([p.title, p.goal].filter(Boolean).join(": "), []);
+      if (hits.length) await addSections(id, [{ title: "Resources", type: "resources", span: 1, notes: JSON.stringify({ query: resourcesQuery(p.title, p.goal), start: 0, hits }), tasks: [] }], planned.length);
     }
   } catch (e) {
     console.warn("[project] couldn't plan the project:", (e as Error).message);
   } finally {
     running.delete(id);
     planning.delete(id);
+  }
+}
+
+type NewSection = { title: string; type: string; span: number; notes: string | null; tasks: string[] };
+// New sections go in at position `at` (the top by default), before the Project Dump and anything you added.
+async function addSections(projectId: string, sections: NewSection[], at = 0) {
+  if (!sections.length) return;
+  await db.section.updateMany({ where: { projectId, order: { gte: at } }, data: { order: { increment: sections.length } } });
+  for (const [i, s] of sections.entries()) {
+    await db.section.create({
+      data: {
+        projectId, type: s.type, title: s.title, order: at + i, span: s.span, notes: s.notes,
+        tasks: { create: s.tasks.map((text, n) => ({ text, order: n })) },
+      },
+    });
   }
 }
 
@@ -364,8 +375,8 @@ export async function upgradeSections() {
   await db.section.updateMany({ where: { type: "notes" }, data: { type: "writing" } });
   await db.section.updateMany({ where: { type: "items" }, data: { type: "sources" } });
   await db.section.deleteMany({ where: { type: "providers" } });
-  // The Sources section is now called Brain Dump, like the inbox it belongs to.
-  await db.section.updateMany({ where: { type: "sources", title: "Sources" }, data: { title: names.inbox } });
+  // The project's own Sources section is now the Project Dump (it was briefly called Brain Dump).
+  await db.section.updateMany({ where: { type: "sources", title: { in: ["Sources", names.inbox] } }, data: { title: names.projectDump } });
   // AI sections used to wait for you to keep them. Now they're just there.
   await db.section.updateMany({ where: { proposed: true }, data: { proposed: false } });
   await db.task.updateMany({ where: { proposed: true }, data: { proposed: false } });
@@ -380,6 +391,6 @@ export async function upgradeSections() {
   const missing = await db.project.findMany({ where: { sections: { none: { type: "sources" } } }, select: { id: true } });
   for (const { id } of missing) {
     const last = await db.section.findFirst({ where: { projectId: id }, orderBy: { order: "desc" }, select: { order: true } });
-    await db.section.create({ data: { projectId: id, type: "sources", title: names.inbox, order: (last?.order ?? -1) + 1 } });
+    await db.section.create({ data: { projectId: id, type: "sources", title: names.projectDump, order: (last?.order ?? -1) + 1 } });
   }
 }

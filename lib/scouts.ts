@@ -192,7 +192,7 @@ async function runScout(id: string) {
     let result: ScoutResult;
 
     if (s.kind === "turn") {
-      await status("reading", `Reading your ${names.inbox}`);
+      await status("reading", `Reading your ${names.projectDump}`);
       const links = [...new Set(s.brief.match(/https?:\/\/[^\s<>"']+/g) ?? [])].slice(0, MAX_PAGES);
       const pages: Page[] = [];
       const parts: string[] = [];
@@ -209,7 +209,7 @@ async function runScout(id: string) {
         pages.push({ n: pages.length + 1, title: name, link: i.url ?? "" });
         parts.push(`[${pages.length}] ${name}${i.url ? ` (${i.url})` : ""}\n${[page?.summary, i.overview].filter(Boolean).join(" ")}\n${clip(page?.text || i.extracted || i.text, 1500)}`);
       }
-      if (!parts.length) { await status("failed", `Nothing to read. Add things to the ${names.inbox}, or paste links in the brief.`); return; }
+      if (!parts.length) { await status("failed", `Nothing to read. Add things to the ${names.projectDump}, or paste links in the brief.`); return; }
       await status("thinking", "Putting it together");
       const a = await chatJSON(TURN_SYSTEM, `Request: ${s.brief}\n\nPages and notes:\n${parts.join("\n\n").slice(0, 14000)}`, {
         type: "object",

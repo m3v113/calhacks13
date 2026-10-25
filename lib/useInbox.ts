@@ -93,6 +93,11 @@ export function useInbox() {
     return patch(id, { categoryId });
   }, [patch]);
 
+  const setDue = useCallback((id: string, due: { dueDate?: string | null; dueTime?: string | null; priority?: number | null }) => {
+    setItems((xs) => xs.map((i) => (i.id === id ? { ...i, ...due } : i)));
+    return patch(id, due);
+  }, [patch]);
+
   const newCategory = useCallback((id: string, categoryName: string) => patch(id, { categoryName }), [patch]);
 
   // Rename or recolor a category. Returns false when the name is already taken.
@@ -127,5 +132,5 @@ export function useInbox() {
     load();
   }, [load]);
 
-  return { categories, items, ai, vision, add, upload, setCategory, newCategory, createCategory, editCategory, deleteCategory, archive, remove, refresh: load };
+  return { categories, items, ai, vision, add, upload, setCategory, setDue, newCategory, createCategory, editCategory, deleteCategory, archive, remove, refresh: load };
 }

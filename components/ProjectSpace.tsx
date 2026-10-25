@@ -12,10 +12,9 @@ import Swatches from "./Swatches";
 import { useDismiss } from "./Projects";
 import InboxPicker, { itemName } from "./InboxPicker";
 import Scouts, { type ScoutDraft } from "./Scouts";
-import { Categories, DRAG, InboxList } from "./Inbox";
 import Mic from "./Mic";
 import { DuePicker } from "./Due";
-import { BackIcon, CheckIcon, CloseIcon, GripIcon, PanelIcon, PlusIcon, RefreshIcon, ScoutIcon, SparkIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
+import { BackIcon, CheckIcon, CloseIcon, GripIcon, PlusIcon, RefreshIcon, ScoutIcon, SparkIcon, TrashIcon, UploadIcon, WidthIcon } from "./Icons";
 
 type Task = { id: string; text: string; detail: string | null; proposed: boolean; done: boolean; dueDate: string | null; dueTime: string | null; priority: number | null };
 type Section = { id: string; type: string; title: string; span: number; notes: string | null; proposed: boolean; tasks: Task[] };
@@ -28,8 +27,6 @@ type Side = "left" | "right" | "top" | "bottom";
 type Inbox = ReturnType<typeof useInbox>;
 
 const TYPES = [{ type: "writing", label: "Writing" }, { type: "tasks", label: "Tasks" }, { type: "assistant", label: "AI" }];
-// An item dragged out of the project's Brain Dump (dropping it on the main Brain Dump takes it out of the project).
-const PDRAG = "application/x-project-item";
 
 // Full-width sections take a row each. Halves between them go into two columns that stack on their own
 // (first, third, … on the left; second, fourth, … on the right), so a short half never leaves a gap
@@ -49,10 +46,6 @@ function layout(sections: Section[]) {
   }
   flush();
   return { bands, alone };
-}
-
-function stored<T>(key: string, fallback: T): T {
-  try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
 }
 
 const api = (url: string, method: string, body?: object) =>
@@ -88,14 +81,8 @@ export default function ProjectSpace({ id }: { id: string }) {
   const [moving, setMoving] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [target, setTarget] = useState<{ id: string; side: Side } | null>(null);
   const [scoutDraft, setScoutDraft] = useState<ScoutDraft | null>(null);
-  // The main Brain Dump, as a panel on the right, to drag things into and out of the project.
-  const [panel, setPanel] = useState(false);
-  const [category, setCategory] = useState<string | null>(null);
-  const [panelOver, setPanelOver] = useState(false);
   const [more, setMore] = useState<{ id: string; busy: boolean; note: string | null } | null>(null);
   const grid = useRef<HTMLDivElement>(null);
-  useEffect(() => setPanel(stored("space.panel", false)), []);
-  const togglePanel = () => { setPanel(!panel); try { localStorage.setItem("space.panel", JSON.stringify(!panel)); } catch {} };
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/projects/${id}`, { cache: "no-store" });
@@ -106,7 +93,7 @@ export default function ProjectSpace({ id }: { id: string }) {
   useEffect(() => { if (project) document.title = project.title; }, [project?.title]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // While the AI builds an Auto project, check back every few seconds.
-  // A new Auto project with nothing but its Brain Dump is still being laid out, too.
+  // A new Auto project with nothing but its Project Dump is still being laid out, too.
   const planning = !!project?.planning;
   const waiting = planning || (project?.kind === "auto" && project.sections.every((s) => s.type === "sources"));
   useEffect(() => {
@@ -276,11 +263,10 @@ export default function ProjectSpace({ id }: { id: string }) {
           )}
         </div>
         <Line className="space-title" label="Project name" value={project.title} onSave={(title) => { update({ title }); save({ title }); }} />
-        <button className={`icon ${panel ? "on" : ""}`} aria-label={panel ? `Hide ${names.inbox}` : `Show ${names.inbox}`} aria-pressed={panel} data-tip={names.inbox} onClick={togglePanel}><PanelIcon /></button>
         <button className="icon" aria-label="Delete project" data-tip="Delete project" onClick={remove}><TrashIcon /></button>
       </header>
 
-      <div className={`space-cols ${panel ? "with-panel" : ""}`}>
+      <div className="space-cols">
         <aside className="side-tray scouts">
           <Scouts projectId={id} draft={scoutDraft} onAdded={() => { load(); inbox.refresh(); }} />
         </aside>
@@ -300,16 +286,6 @@ export default function ProjectSpace({ id }: { id: string }) {
             )))}
         </main>
 
-        {panel && (
-          <aside className={`side-tray space-panel ${panelOver ? "over" : ""}`}
-            onDragOver={(e) => { if (e.dataTransfer.types.includes(PDRAG)) { e.preventDefault(); setPanelOver(true); } }}
-            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPanelOver(false); }}
-            onDrop={(e) => { const i = e.dataTransfer.getData(PDRAG); setPanelOver(false); if (i) { e.preventDefault(); unlink(i); } }}>
-            <div className="label">{names.inbox}</div>
-            <Categories inbox={inbox} selected={category} onSelect={setCategory} chips />
-            <InboxList inbox={inbox} selected={category} exclude={new Set(project.items.map((i) => i.id))} />
-          </aside>
-        )}
       </div>
 
       <div className="add-section" ref={addRef}>
@@ -372,29 +348,23 @@ function Tasks({ section, setSection, planning, onScout }: {
 function SourceRow({ item, color, onOpen, onRemove }: { item: Item; color?: string; onOpen: () => void; onRemove?: () => void }) {
   const pending = item.sortedBy === "pending";
   return (
-    <li draggable={!!onRemove && !pending} onDragStart={(e) => { e.dataTransfer.setData(PDRAG, item.id); e.dataTransfer.effectAllowed = "move"; }}
-      onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) onOpen(); }}>
+    <li onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) onOpen(); }}>
       <span className={`dot ${pending ? "pending" : ""}`} style={pending ? undefined : { background: color || "var(--line)" }} />
       <span className="name">{itemName(item)}</span>
-      {onRemove && <button className="icon small fade" aria-label="Remove from project" onClick={onRemove}><CloseIcon /></button>}
+      {onRemove && <button className="icon small fade" aria-label={`Back to ${names.inbox}`} data-tip={`Back to ${names.inbox}`} onClick={onRemove}><CloseIcon /></button>}
     </li>
   );
 }
 
-// The project's Brain Dump: its own items sorted by category, the ones of linked projects, a box to add new ones
-// (which go to the main Brain Dump too), and a picker for items already there. Items dragged in from the
-// main Brain Dump panel join the project; dragging one back out takes it out of the project.
+// The Project Dump: this project's own items sorted by category, the ones of linked projects, a box to add
+// new ones (they stay in this project), and a picker to move items over from the main Brain Dump.
 function Sources({ project, inbox, reload, onOpen, link, unlink }: {
   project: Project; inbox: Inbox; reload: () => void; onOpen: (id: string) => void; link: (item: Item) => void; unlink: (id: string) => void;
 }) {
   const [text, setText] = useState("");
   const [picking, setPicking] = useState(false);
   const [up, setUp] = useState(false);
-  const [over, setOver] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
-  const spoken = useRef(false);
-  const latest = useRef(text);
-  latest.current = text;
   const ref = useDismiss<HTMLDivElement>(picking, () => setPicking(false));
   const color = new Map(inbox.categories.map((c) => [c.id, c.color]));
   const mine = new Set(project.items.map((i) => i.id));
@@ -429,14 +399,7 @@ function Sources({ project, inbox, reload, onOpen, link, unlink }: {
   };
 
   return (
-    <div className={`brain ${over ? "over" : ""}`}
-      onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG)) { e.preventDefault(); setOver(true); } }}
-      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false); }}
-      onDrop={(e) => {
-        setOver(false);
-        const item = inbox.items.find((i) => i.id === e.dataTransfer.getData(DRAG));
-        if (item) { e.preventDefault(); link(item); }
-      }}>
+    <div className="brain">
       {groups.map((g) => (
         <div key={g.id} className="brain-group">
           {g.name && <div className="pick-head">{g.name}</div>}
@@ -460,8 +423,7 @@ function Sources({ project, inbox, reload, onOpen, link, unlink }: {
         <input value={text} placeholder="Paste a link or write a note" aria-label="Add a source"
           onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) add(); }}
           onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); upload(e.clipboardData.files); } }} />
-        <Mic onStart={() => { spoken.current = !text.trim(); }} onText={(t) => setText((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t))}
-          onDone={() => { if (spoken.current) add(latest.current.trim()); }} />
+        <Mic value={text} onChange={setText} onDone={(said, fresh) => { if (fresh) add(said); }} />
         <button className="icon small" aria-label="Upload a file" data-tip="Upload" onClick={() => picker.current?.click()}><UploadIcon /></button>
         <input ref={picker} type="file" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ""; }} />
         <div className="add-linked" ref={ref}>
@@ -477,7 +439,7 @@ function Sources({ project, inbox, reload, onOpen, link, unlink }: {
 type Hit = { title: string; link: string; description: string };
 
 // Resources: pages to read, with what each one offers. The refresh button above adds more. Each page can be
-// moved to the project's Brain Dump (its summary comes along, so the page isn't read again) or removed.
+// moved to the Project Dump (its summary comes along, so the page isn't read again) or removed.
 function Resources({ section, busy, note, onChange, onMove }: {
   section: Section; busy: boolean; note: string | null; onChange: (notes: string) => void; onMove: (h: Hit) => void;
 }) {
@@ -497,7 +459,7 @@ function Resources({ section, busy, note, onChange, onMove }: {
               <span className="res-host">{host(h.link)}</span>
             </a>
             <div className="res-actions">
-              <button className="icon small" aria-label={`Move to ${names.inbox}`} data-tip={`Move to ${names.inbox}`} onClick={() => { onMove(h); drop(h); }}><PlusIcon /></button>
+              <button className="icon small" aria-label={`Move to ${names.projectDump}`} data-tip={`Move to ${names.projectDump}`} onClick={() => { onMove(h); drop(h); }}><PlusIcon /></button>
               <button className="icon small" aria-label="Remove" data-tip="Remove" onClick={() => drop(h)}><CloseIcon /></button>
             </div>
           </li>

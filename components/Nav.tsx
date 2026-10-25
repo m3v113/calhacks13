@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { names } from "@/lib/names";
-import { HubIcon, InboxIcon, MoonIcon, SunIcon, SystemIcon } from "./Icons";
+import { CalendarIcon, HubIcon, InboxIcon, MoonIcon, SunIcon, SystemIcon } from "./Icons";
 
 type Theme = "system" | "light" | "dark";
 const NEXT: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
@@ -42,6 +42,7 @@ export default function Nav({ ai, vision }: { ai: boolean | null; vision?: boole
     <nav className="nav">
       <Link href="/" className={path === "/" ? "on" : ""} data-tip={names.hub} aria-label={names.hub}><HubIcon /></Link>
       <Link href="/inbox" className={path === "/inbox" ? "on" : ""} data-tip={names.inbox} aria-label={names.inbox}><InboxIcon /></Link>
+      <Link href="/tasks" className={path === "/tasks" ? "on" : ""} data-tip={names.tasks} aria-label={names.tasks}><CalendarIcon /></Link>
       <ThemeButton />
       <span className={`status ${ai === null ? "" : ai ? "ai" : "rules"}`} data-tip={status} tabIndex={0} aria-label={status} />
     </nav>

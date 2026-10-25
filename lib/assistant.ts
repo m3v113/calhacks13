@@ -19,7 +19,7 @@ export function readAsks(notes: string | null): Answer[] {
   }
 }
 
-const SYSTEM = `You help someone with their personal project, using only what you're given: the project's writing, tasks, and ${names.inbox} (saved links, notes, and files), plus any text or pages in the request.
+const SYSTEM = `You help someone with their personal project, using only what you're given: the project's writing, tasks, and ${names.projectDump} (saved links, notes, and files), plus any text or pages in the request.
 into: what the request wants.
 - "tasks": things to do for the project. items: 3 to 10 short tasks, each starting with a verb, most urgent first, with due dates when what you're given has them. reply: "".
 - "citations": one full citation for each source, in the style asked for (APA if none). Put *asterisks* around the parts that should be italic. items: the citations, in alphabetical order. reply: "".
@@ -32,7 +32,7 @@ Answer with JSON: {"into": "answer", "title": "...", "reply": "...", "items": []
 const clip = (t: string, n: number) => t.replace(/\s+/g, " ").trim().slice(0, n);
 const text = (html: string) => html.replace(/<\/(p|h\d|li)>/g, "\n").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/[ \t]+/g, " ").trim();
 
-// What the AI reads: the project's writing and tasks, its Brain Dump (with page text), and links pasted in the request.
+// What the AI reads: the project's writing and tasks, its Project Dump (with page text), and links pasted in the request.
 async function context(projectId: string, q: string) {
   const p = await db.project.findUnique({
     where: { id: projectId },
@@ -58,7 +58,7 @@ async function context(projectId: string, q: string) {
     `Project: ${[p.title, p.goal].filter(Boolean).join(": ")}`,
     writing.length && `Writing:\n${writing.join("\n\n")}`,
     tasks.length && `Tasks:\n${tasks.join("\n\n")}`,
-    items.length && `${names.inbox}:\n${items.join("\n")}`,
+    items.length && `${names.projectDump}:\n${items.join("\n")}`,
     pages.length && `Pages linked in the request:\n${pages.join("\n")}`,
   ].filter(Boolean).join("\n\n").slice(0, 14000);
 }

@@ -18,7 +18,7 @@ const BUSY = ["searching", "reading", "thinking"];
 const ABOUT: Record<ScoutKind, string> = {
   find: "Finds real options on the web and lines them up to compare, with prices, sizes, or ratings when the pages give them. For things to buy, people to hire, or papers to read. Save the ones you like to the project.",
   answer: "Searches the web and answers your question in a few short points. Each point links to the page it came from, so you can check it.",
-  turn: `Turns your ${names.inbox} into tasks, citations, a table, or an outline.`,
+  turn: `Turns your ${names.projectDump} into tasks, citations, a table, or an outline.`,
 };
 const PLACEHOLDER: Record<ScoutKind, string> = {
   find: "52-inch fan with a light under $200",
@@ -196,7 +196,7 @@ function Result({ scout, saved, onSaveLink, onAdd }: {
               <li key={key}>
                 <div className="opt-top">
                   <a href={o.link} target="_blank" rel="noreferrer" className="opt-name">{o.name}</a>
-                  <button className="icon small" aria-label={`Save ${o.name} to ${names.inbox}`} data-tip={`Save to ${names.inbox}`} disabled={saved.has(key)} onClick={() => onSaveLink(key, o.link, o.name, o.why)}>
+                  <button className="icon small" aria-label={`Save ${o.name} to ${names.projectDump}`} data-tip={`Save to ${names.projectDump}`} disabled={saved.has(key)} onClick={() => onSaveLink(key, o.link, o.name, o.why)}>
                     {saved.has(key) ? <CheckIcon /> : <PlusIcon />}
                   </button>
                 </div>

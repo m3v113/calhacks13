@@ -8,7 +8,7 @@ The running log for Project Scaffold: what's done, what's next, and why. Newest 
 
 ## Now
 
-**Working on:** rounds 4 and 5 (PR #10): Resources, AI section, project Brain Dumps, search, the Cartesia mic, and the Tasks tab.
+**Working on:** rounds 4 to 6 (PR #10): Resources, AI section, Project Dumps, search, the live Cartesia mic, and the Tasks page. Next: a voice feature for the Cartesia track, once Mehvish picks one (`plans/cartesia-voice.md`).
 **Done:** F1 Smart Inbox, now called Brain Dump (PR #5, renamed in PR #7), F3 + F4 first version (PR #6, merged).
 
 ## Setup and running (current)
@@ -63,6 +63,15 @@ Ordered. Feature numbers match the plan.
 ---
 
 ## Log
+
+### 2026-10-25 · Round 6: live mic, Project Dump, Tasks page, speed (PR #10)
+
+Mehvish tried round 5 on her Mac. Added to the same PR.
+
+- **Words didn't appear while speaking:** the mic now streams to Cartesia's live speech to text (`wss://api.cartesia.ai/stt/turns/websocket`, model `ink-2`, raw 16-bit audio at 16 kHz). Cartesia sends each turn's words as they're heard (`turn.update`) and the final text when you pause (`turn.end`). The browser gets a 10-minute token that can only transcribe (`POST /api/transcribe/token`, which calls Cartesia's `/access-token`), so the key stays on the server. If the live connection can't open, the old 3-second pieces are the fallback. Tested with a mocked WebSocket, not yet against Cartesia itself.
+- **The Brain Dump side panel on project pages is gone.** Each project's own section is now the **Project Dump** (old "Brain Dump" and "Sources" titles are renamed on load). **From Brain Dump** moves items in from the Brain Dump, × sends one back. Scouts, Resources, and the AI section all say Project Dump.
+- **Tasks has its own page** (`/tasks`), behind a calendar icon in the sidebar next to the Brain Dump icon, which is where Mehvish looked for it. It has an **Add a task** box (a Brain Dump item due today unless you pick a date) and each date can be changed in place. The Hub panel's Tasks tab stays. Brain Dump rows get a calendar button on hover, so you don't have to open the tray.
+- **Faster:** Ollama now keeps the model loaded for 30 minutes (`keep_alive`), and the app loads it as soon as a page is open, so the first answer doesn't wait for it to load. Plans ask for 3 or 4 parts with a token cap, the wait for a project's links to be read is 8 seconds at most (was 30), and with web search the Resources section shows right away while the AI writes the rest. A smaller model (`gemma3:1b`) is faster still but sorts less well; left as a choice in the README.
 
 ### 2026-10-25 · Round 5: project Brain Dumps, Tasks tab, fixes (PR #10)
 

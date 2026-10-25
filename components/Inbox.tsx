@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Category, Item, useInbox } from "@/lib/useInbox";
 import { CloseIcon, DocIcon, ImageIcon, LinkIcon, MoreIcon, NoteIcon, PlusIcon, ScoutIcon, TrashIcon } from "./Icons";
 import Mic from "./Mic";
-import { DueChip } from "./Due";
+import { DuePicker } from "./Due";
 import { COLORS } from "@/lib/colors";
 import ItemView from "./ItemView";
 
@@ -131,9 +131,6 @@ export function InboxList({ inbox, selected, exclude }: { inbox: Inbox; selected
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const addMenu = useRef<HTMLDivElement>(null);
-  const spoken = useRef(false);
-  const latest = useRef(text);
-  latest.current = text;
   const byId = new Map(inbox.categories.map((c) => [c.id, c]));
   const needle = q.trim().toLowerCase();
   const items = inbox.items.filter((i) => (!selected || i.categoryId === selected) && !exclude?.has(i.id) && matches(i, needle));
@@ -214,8 +211,7 @@ export function InboxList({ inbox, selected, exclude }: { inbox: Inbox; selected
           }}
         />
         {/* The words show up in the box as you speak. Started with an empty box, the note saves itself when you stop (hands-free). */}
-        <Mic onStart={() => { spoken.current = !text.trim(); }} onText={(t) => setText((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t))}
-          onDone={() => { if (spoken.current) { const t = latest.current.trim(); setText(""); if (t) inbox.add(t, "note"); } }} />
+        <Mic value={text} onChange={setText} onDone={(said, fresh) => { if (fresh) { setText(""); if (said) inbox.add(said, "note"); } }} />
         <input ref={picker} type="file" multiple hidden onChange={(e) => { files(e.target.files); e.target.value = ""; }} />
       </div>
       {inbox.items.length > 0 && (
@@ -283,7 +279,7 @@ function Row({ item, category, inbox, showCat, onOpen }: { item: Item; category?
         {item.kind === "link" && !heading && <div className="text">{(item.url && fromUrl(item.url)) ?? item.url ?? text}</div>}
         {item.url && <div className="host">{host(item.url)}</div>}
         {item.kind === "document" && !pending && item.title !== item.fileName && <div className="host">{item.fileName}</div>}
-        <DueChip due={{ dueDate: item.dueDate ?? null, dueTime: item.dueTime ?? null, priority: item.priority ?? null }} />
+        {!pending && <DuePicker due={{ dueDate: item.dueDate ?? null, dueTime: item.dueTime ?? null, priority: item.priority ?? null }} onChange={(d) => inbox.setDue(item.id, d)} />}
       </div>
       {item.kind === "image" && !item.id.startsWith("tmp-") && (
         <span className="thumb"><img src={`/api/files/${item.id}`} alt="" /></span>
